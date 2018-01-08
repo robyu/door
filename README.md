@@ -16,9 +16,9 @@ upload.sh expects there to be a file called webapi_url.txt, which specifies the 
 URL.  The file should contain a single line of the form:
       \/trigger\/your_event_name\/with\/key\/key_string
 
-replacing
-	your_event_name with your webhook event name
-	key_string with the webhook key
+replace	your_event_name with your webhook event name
+
+replace	key_string with the webhook key
 
 License
 =======
