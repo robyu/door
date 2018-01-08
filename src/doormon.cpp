@@ -142,7 +142,7 @@ static void do_steadystate(doormon_t *pstate, int is_connected)
             pstate->event_time_ms = millis();  // reset timer
             if (is_connected)
             {
-                tx_send("door has been open", String(elapsed_ms/1000.0));
+                tx_send("door has been open", String(elapsed_ms/1000.0) + " sec");
             }
         }
         break;

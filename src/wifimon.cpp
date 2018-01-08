@@ -1,5 +1,6 @@
 
 
+
 #include "Arduino.h"
 #include "WiFiClient.h"
 #include <DNSServer.h>            //Local DNS Server used for redirecting all requests to the configuration portal
@@ -214,7 +215,7 @@ static void do_transitions(wifimon_t *pstate, wifi_state_t next_state)
 
         case WM_CONNECTED:
             pstate->led_state = 1;
-            tx_send("connected_to_wifi","");
+            //tx_send("connected_to_wifi","");
             break;
 
         case WM_REBOOT:
