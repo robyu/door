@@ -48,6 +48,13 @@ void wifimon_init(wifimon_t *pstate, int led_pin, int reset_button_pin)
     pstate->threshold_not_connected_ms = 20000;
 }
 
+/*
+see state machine diagram
+wifimon-state-machine.pdf
+or
+https://docs.google.com/drawings/d/1ZojjvD8IzcoGZNFNz5XOvnSn9KmD7tuCvef_ixaX7fY/edit?usp=sharing
+*/
+
 static wifi_state_t do_update(wifimon_t *pstate)
 {
     wifi_state_t next_state;
