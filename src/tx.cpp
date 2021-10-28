@@ -118,7 +118,6 @@ int tx_send(String descr, String val)
       compose and send HTTP POST
     */
     {
-        boolean connected;
         char pheader[255];
         String content = "{\"value1\" : \"" + descr + "\", \"value2\" : \"" + val + "\"}";
 

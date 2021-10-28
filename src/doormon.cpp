@@ -192,15 +192,15 @@ static void do_transitions(doormon_t *pstate, doormon_state_t next_state, int is
 void doormon_update(doormon_t *pstate, int is_connected)
 {
     doormon_state_t next_state;
+#ifdef ISTHISUSED
     {
         int on_off;
         on_off =  (switch_update_state(&pstate->door_sensor0)==DOOR_OPEN) || 
             (switch_update_state(&pstate->door_sensor1)==DOOR_OPEN) || 
             switch_update_state(&pstate->test_button);
-#ifdef DEBUG
 
-#endif
     }
+#endif
     next_state = do_update(pstate, is_connected);
     do_transitions(pstate, next_state, is_connected);
     do_steadystate(pstate, is_connected);

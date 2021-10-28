@@ -45,6 +45,7 @@ long utils_get_elapsed_msec_and_reset(long* pevent_time_ms)
         elapsed_ms = LONG_MAX;
         *pevent_time_ms = millis(); // reset
     }
+    return elapsed_ms;
 }
 
 // from http://playground.arduino.cc/Code/PrintFloats

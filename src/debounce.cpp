@@ -46,7 +46,7 @@ int Debounce(Debounce_t *pState)
         pState->lastDebounceTime = millis();
     } 
   
-    if ((millis() - pState->lastDebounceTime) > pState->debounceDelay) {
+    if ((millis() - pState->lastDebounceTime) > (long unsigned int)pState->debounceDelay) {
         // whatever the reading is at, it's been there for longer
         // than the debounce delay, so take it as the actual current state:
 
