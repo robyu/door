@@ -1,33 +1,63 @@
 #
-# do "platformio run" from within docker
-alias dp_run="docker run --rm  -v $(pwd)/dotplatformio:/.platformio --mount type=bind,source="$(pwd)",target=/workspace  -u `id -u $USER`:`id -g $USER` sglahn/platformio-core:latest run"
-
+# aliases for docker-based platformio
+# based on that script in sglahn/platformio-core
 #
-# get bash prompt from inside docker
-alias dp_bash="docker run --rm  -it -v $(pwd)/dotplatformio:/.platformio --mount type=bind,source="$(pwd)",target=/workspace  -u `id -u $USER`:`id -g $USER` --entrypoint=/bin/bash sglahn/platformio-core:latest -i"
 
 
 #
-# "dp" is a general docker platformio-core replacement for "pio" or "platformio"
-dp()
+# USAGE: substitute dpio for pio
+# e.g.
+# dpio run
+dpio()
 {
-    params=()
-    if [ -n ${1} ]; then
-	echo "1: ${1}"
-	params+=( ${1} )
-    fi
-    if [ -n ${2} ]; then
-	echo "2: ${2}"
-	params+=( ${2} )
-    fi
-    if [ -n ${3} ]; then
-	echo "3: ${3}"
-	params+=( ${3} )
-    fi
-    echo "params=${params[@]}"
+    IMAGE_NAME=sglahn/platformio-core:latest
     
-    docker run --rm  -v $(pwd)/dotplatformio:/.platformio \
-	   --mount type=bind,source="$(pwd)",target=/workspace \
-	   -u `id -u $USER`:`id -g $USER` sglahn/platformio-core:latest "${params[@]}"
+    DEVICE=
+    if [ -e /dev/ttyUSB0 ]; then
+	DEVICE="--device=/dev/ttyUSB0"
+    fi
+    if [ "$UPLOAD_PORT" ]; then
+	DEVICE=$UPLOAD_PORT
+    fi
+    if [ "$DEVICE" ]; then
+	echo "Using upload port $DEVICE"
+    fi
+
+    docker run --rm \
+	   -v $(pwd)/dotplatformio:/.platformio \
+	   -v "$(pwd)":/workspace \
+	   -u `id -u $USER`:`id -g $USER` \
+	   $DEVICE \
+	   $IMAGE_NAME \
+	   $@
+}
+
+#
+# use dpio_bash to run the docker container in interactive mode
+# with a bash prompt
+dpio_bash()
+{
+    IMAGE_NAME=sglahn/platformio-core:latest
+    
+    DEVICE=
+    if [ -e /dev/ttyUSB0 ]; then
+	DEVICE="--device=/dev/ttyUSB0"
+    fi
+    if [ "$UPLOAD_PORT" ]; then
+	DEVICE=$UPLOAD_PORT
+    fi
+    if [ "$DEVICE" ]; then
+	echo "Using upload port $DEVICE"
+    fi
+
+    docker run --rm \
+	   -it \
+	   -v $(pwd)/dotplatformio:/.platformio \
+	   -v "$(pwd)":/workspace \
+	   -u `id -u $USER`:`id -g $USER` \
+	   $DEVICE \
+	   --entrypoint=/bin/bash \
+	   $IMAGE_NAME \
+	   -i 
 }
 
