@@ -25,10 +25,7 @@ void test_loop_with_inputs(void) {
     time0_ms = millis();
     while((int)(millis() - time0_ms) <= (1000 * test_duration_s))
     {
-        const char *pstate_str;
-        
         doormon_update(&doormon);
-        pstate_str = doormon_get_curr_state_as_string(&doormon);
         
         delay(100); // pause for a bit
         

@@ -36,6 +36,11 @@ void utils_set_led(int led_pin, int on_off)
 }
 
 
+/*
+given baseline time (event_time_ms),
+get elapsed time.
+reset event_time_ms if the elapsed time wraps
+*/
 long utils_get_elapsed_msec_and_reset(long* pevent_time_ms)
 {
     long elapsed_ms;

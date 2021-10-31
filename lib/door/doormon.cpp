@@ -20,9 +20,11 @@ typedef struct
     const char *pvalue_str;
 } state_enum_descr_t;
 
+/*
+table for converting state enums to strings
+*/
 #define STATE_ENUM_DECLARE(ENUM) {ENUM, #ENUM}
 #define STATE_ENUM_END {0, NULL}
-    
 static state_enum_descr_t doormon_state_descr[] =
 {
     STATE_ENUM_DECLARE(DM_DONT_USE),
@@ -96,6 +98,7 @@ static doormon_state_t do_update(doormon_t *pstate)
         }
         else
         {
+            // door sensors = closed
             next_state = DM_DOOR_CLOSED;
         }
         break;
@@ -106,10 +109,15 @@ static doormon_state_t do_update(doormon_t *pstate)
         {
             next_state = DM_DOOR_CLOSING;
         }
+        else
+        {
+            // door sensors = open
+            ;
+        }
         break;
 
     case DM_DOOR_CLOSING:
-        if ((switch_update_state(&pstate->door_sensor0)==DOOR_CLOSED) ||
+        if ((switch_update_state(&pstate->door_sensor0)==DOOR_CLOSED) &&
             (switch_update_state(&pstate->test_button)==0)) 
         {
             if (utils_get_elapsed_msec_and_reset(&pstate->event_time_ms) > DOORMON_DOOR_TRANSITION_MS)
@@ -122,13 +130,14 @@ static doormon_state_t do_update(doormon_t *pstate)
         }
         else
         {
+            // door sensor = open
             next_state = DM_DOOR_OPEN;
         }
         break;
     default:
         //
         // shouldn't ever get here!
-        Serial.println("doormon:do_update illegal state " + String(doormon_state_to_string(pstate->curr_state)));
+        Serial.println(String("doormon:do_update illegal state ") + String(doormon_state_to_string(pstate->curr_state)));
         utils_restart();
     }
 
@@ -222,7 +231,7 @@ doormon_state_t doormon_update(doormon_t *pstate)
 }
 
 
-const char* doormon_state_to_string(doormon_state_t state)
+const char*  doormon_state_to_string(doormon_state_t state)
 {
     return doormon_state_descr[(int)state].pvalue_str;
 }
