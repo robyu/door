@@ -55,7 +55,7 @@ void setup() {
 }
 
 uint8_t i = 0;
-uint8_t max_blinks = 10;
+uint8_t max_blinks = 5;
 
 void loop() {
     if (i < max_blinks)

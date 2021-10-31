@@ -2,7 +2,7 @@
 #define GPIO_PINS_H
 
 #define BTN_RESET    14  
-#define BTN_DOOR     12 
+#define BTN_DOOR_TEST  12 
 #define REED_SWITCH0 5   
 #define REED_SWITCH1 4
 

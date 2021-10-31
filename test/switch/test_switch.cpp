@@ -99,7 +99,7 @@ void setup() {
     //RUN_TEST(test_led_builtin_pin_number);
 
     switch_init(&switch_reed0, REED_SWITCH0);
-    switch_init(&switch_door_btn, BTN_DOOR);
+    switch_init(&switch_door_btn, BTN_DOOR_TEST);
     switch_init(&switch_reset, BTN_RESET);
 }
 

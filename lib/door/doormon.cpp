@@ -1,12 +1,10 @@
 
 
 #include "Arduino.h"
-#include "WiFiClient.h"
 #include <assert.h>
 #include "doormon.h"
 #include "switch.h"
 #include "utils.h"
-#include "tx.h"
 
 #define DEBUG 1
 
@@ -16,6 +14,27 @@
 #define DOOR_OPEN   0
 #define DOOR_CLOSED 1
 
+typedef struct 
+{
+    int value;
+    const char *pvalue_str;
+} state_enum_descr_t;
+
+#define STATE_ENUM_DECLARE(ENUM) {ENUM, #ENUM}
+#define STATE_ENUM_END {0, NULL}
+    
+static state_enum_descr_t doormon_state_descr[] =
+{
+    STATE_ENUM_DECLARE(DM_DONT_USE),
+    STATE_ENUM_DECLARE(DM_INIT),
+    STATE_ENUM_DECLARE(DM_DOOR_CLOSED),
+    STATE_ENUM_DECLARE(DM_DOOR_OPENING),
+    STATE_ENUM_DECLARE(DM_DOOR_OPEN),
+    STATE_ENUM_DECLARE(DM_DOOR_CLOSING),
+    STATE_ENUM_DECLARE(DM_LAST_DONT_USE),
+    STATE_ENUM_END
+};
+
 /*
   door_sensor_pin:  pin attached to reed switch
   test_button_pin:  pin attached to test button
@@ -23,7 +42,6 @@
 */
 void doormon_init(doormon_t *pstate, 
                   int door_sensor_pin0, 
-                  int door_sensor_pin1, 
                   int test_button_pin, 
                   int led_pin)
 {
@@ -39,7 +57,6 @@ void doormon_init(doormon_t *pstate,
         pstate->led_pin = -1;
     }
     switch_init(&pstate->door_sensor0, door_sensor_pin0);
-    switch_init(&pstate->door_sensor1, door_sensor_pin1);
     switch_init(&pstate->test_button, test_button_pin);
 
     pstate->curr_state = DM_INIT;
@@ -48,7 +65,7 @@ void doormon_init(doormon_t *pstate,
 /*
   determine state machine's next state
 */
-static doormon_state_t do_update(doormon_t *pstate, int is_connected)
+static doormon_state_t do_update(doormon_t *pstate)
 {
     doormon_state_t next_state = pstate->curr_state;
     switch(pstate->curr_state)
@@ -59,7 +76,6 @@ static doormon_state_t do_update(doormon_t *pstate, int is_connected)
 
     case DM_DOOR_CLOSED:
         if ((switch_update_state(&pstate->door_sensor0)==DOOR_OPEN) ||
-            (switch_update_state(&pstate->door_sensor1)==DOOR_OPEN) ||            
             (switch_update_state(&pstate->test_button)==1))
         {
             next_state = DM_DOOR_OPENING;
@@ -68,18 +84,13 @@ static doormon_state_t do_update(doormon_t *pstate, int is_connected)
 
     case DM_DOOR_OPENING:
         if ((switch_update_state(&pstate->door_sensor0)==DOOR_OPEN) ||
-            (switch_update_state(&pstate->door_sensor1)==DOOR_OPEN) ||
             (switch_update_state(&pstate->test_button)==1)) 
         {
-            if (utils_get_elapsed_msec_and_reset(&pstate->event_time_ms) > DOORMON_DOOR_OPENING_MS)
+            if (utils_get_elapsed_msec_and_reset(&pstate->event_time_ms) > DOORMON_DOOR_TRANSITION_MS)
             {
 #ifdef DEBUG                
                 Serial.println("doormon: door is definitely open");
 #endif
-                if (is_connected)
-                {
-                    tx_send("door just opened","");
-                }
                 next_state = DM_DOOR_OPEN;
             }
         }
@@ -91,67 +102,72 @@ static doormon_state_t do_update(doormon_t *pstate, int is_connected)
 
     case DM_DOOR_OPEN:
         if ((switch_update_state(&pstate->door_sensor0)==DOOR_CLOSED) &&
-            (switch_update_state(&pstate->door_sensor1)==DOOR_CLOSED) &&
             (switch_update_state(&pstate->test_button)==0))
         {
-            next_state = DM_DOOR_CLOSED;
+            next_state = DM_DOOR_CLOSING;
         }
         break;
 
+    case DM_DOOR_CLOSING:
+        if ((switch_update_state(&pstate->door_sensor0)==DOOR_CLOSED) ||
+            (switch_update_state(&pstate->test_button)==0)) 
+        {
+            if (utils_get_elapsed_msec_and_reset(&pstate->event_time_ms) > DOORMON_DOOR_TRANSITION_MS)
+            {
+#ifdef DEBUG                
+                Serial.println("doormon: door is definitely closed");
+#endif
+                next_state = DM_DOOR_CLOSED;
+            }
+        }
+        else
+        {
+            next_state = DM_DOOR_OPEN;
+        }
+        break;
     default:
         //
         // shouldn't ever get here!
-        Serial.println("doormon:do_update illegal state " + String(pstate->curr_state));
+        Serial.println("doormon:do_update illegal state " + String(doormon_state_to_string(pstate->curr_state)));
         utils_restart();
     }
 
-    if (next_state != pstate->curr_state)
-    {
-#ifdef DEBUG
-        Serial.println("doormon: transition curr_state=" + String(pstate->curr_state) + " next_state = " + String(next_state));
-#endif
-    }
     return next_state;
 }
 
-static void do_steadystate(doormon_t *pstate, int is_connected)
+static void do_steadystate(doormon_t *pstate)
 {
     long elapsed_ms;
     switch(pstate->curr_state)
     {
     case DM_DOOR_CLOSED:
-        utils_set_led(pstate->led_pin, 0);
+        pstate->led_state = 0;
         break;
 
     case DM_DOOR_OPENING:
-        utils_set_led(pstate->led_pin, 1);
+        pstate->led_state ^= 1;   // blink
         break;
         
     case DM_DOOR_OPEN:
-        utils_set_led(pstate->led_pin, 1);
+        pstate->led_state = 1;
         
         elapsed_ms = utils_get_elapsed_msec_and_reset(&pstate->event_time_ms);
 #ifdef DEBUG
         Serial.println("door has been open " + String(elapsed_ms/1000.0) + " sec");
 #endif        
-        if (elapsed_ms > DOORMON_ALERT_INTERVAL_MS)
-        {
-#ifdef DEBUG
-            Serial.println("ALERT: door open " + String(elapsed_ms/1000.0));
-#endif
-            pstate->event_time_ms = millis();  // reset timer
-            if (is_connected)
-            {
-                tx_send("door has been open", String(elapsed_ms/1000.0) + " sec");
-            }
-        }
         break;
+
+    case DM_DOOR_CLOSING:
+        pstate->led_state ^= 1;   // blink
+        break;
+
     default:
         ;
     }
+    utils_set_led(pstate->led_pin, pstate->led_state);
 }
 
-static void do_transitions(doormon_t *pstate, doormon_state_t next_state, int is_connected)
+static void do_transitions(doormon_t *pstate, doormon_state_t next_state)
 {
     if (next_state == pstate->curr_state)
     {
@@ -159,15 +175,12 @@ static void do_transitions(doormon_t *pstate, doormon_state_t next_state, int is
     }
     else
     {
+        Serial.println(String(doormon_state_to_string(pstate->curr_state)) + "-->" + String(doormon_state_to_string(next_state)));
         switch(next_state)
         {
         case DM_DOOR_CLOSED:
             if (pstate->curr_state==DM_DOOR_OPEN)
             {
-                if (is_connected)
-                {
-                    tx_send("door has closed","");
-                }
             }
             break;
             
@@ -179,29 +192,43 @@ static void do_transitions(doormon_t *pstate, doormon_state_t next_state, int is
             pstate->event_time_ms = millis();
             break;
             
+        case DM_DOOR_CLOSING:
+            pstate->event_time_ms = millis();
+            break;
+
         default:
             //
             // shouldn't ever get here!
-            Serial.println("doormon:do_transitions illegal state " + String(pstate->curr_state));
+            Serial.println("doormon:do_transitions illegal state " + String(doormon_state_to_string(pstate->curr_state)));
             utils_restart();
         }
         pstate->curr_state = next_state;
     }
 }
 
-void doormon_update(doormon_t *pstate, int is_connected)
+doormon_state_t doormon_update(doormon_t *pstate)
 {
     doormon_state_t next_state;
-#ifdef ISTHISUSED
-    {
-        int on_off;
-        on_off =  (switch_update_state(&pstate->door_sensor0)==DOOR_OPEN) || 
-            (switch_update_state(&pstate->door_sensor1)==DOOR_OPEN) || 
-            switch_update_state(&pstate->test_button);
+    // {
+    //     int on_off;
+    //     on_off =  (switch_update_state(&pstate->door_sensor0)==DOOR_OPEN) || 
+    //         switch_update_state(&pstate->test_button);
 
-    }
-#endif
-    next_state = do_update(pstate, is_connected);
-    do_transitions(pstate, next_state, is_connected);
-    do_steadystate(pstate, is_connected);
+    // }
+    next_state = do_update(pstate);
+    do_transitions(pstate, next_state);
+    do_steadystate(pstate);
+    return next_state;
+}
+
+
+const char* doormon_state_to_string(doormon_state_t state)
+{
+    return doormon_state_descr[(int)state].pvalue_str;
+}
+
+const char* doormon_get_curr_state_as_string(const doormon_t *pstate)
+{
+    doormon_state_t curr_state = pstate->curr_state;
+    return doormon_state_to_string(curr_state);
 }
