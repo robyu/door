@@ -1,5 +1,3 @@
-
-
 #include "Arduino.h"
 #include <assert.h>
 #include "doormon.h"
@@ -61,6 +59,8 @@ void doormon_init(doormon_t *pstate,
     switch_init(&pstate->door_sensor0, door_sensor_pin0);
     switch_init(&pstate->test_button, test_button_pin);
 
+    pstate->transition_wait_ms = DOORMON_DOOR_TRANSITION_WAIT_MS;
+
     pstate->curr_state = DM_INIT;
 }
 
@@ -78,7 +78,8 @@ static doormon_state_t do_update(doormon_t *pstate)
 
     case DM_DOOR_CLOSED:
         if ((switch_update_state(&pstate->door_sensor0)==DOOR_OPEN) ||
-            (switch_update_state(&pstate->test_button)==1))
+            (switch_update_state(&pstate->test_button)==1) ||
+            (pstate->test_flag==1))
         {
             next_state = DM_DOOR_OPENING;
         }
@@ -86,9 +87,10 @@ static doormon_state_t do_update(doormon_t *pstate)
 
     case DM_DOOR_OPENING:
         if ((switch_update_state(&pstate->door_sensor0)==DOOR_OPEN) ||
-            (switch_update_state(&pstate->test_button)==1)) 
+            (switch_update_state(&pstate->test_button)==1) ||
+            (pstate->test_flag)) 
         {
-            if (utils_get_elapsed_msec_and_reset(&pstate->event_time_ms) > DOORMON_DOOR_TRANSITION_MS)
+            if (utils_get_elapsed_msec_and_reset(&pstate->transition_time_ms) > pstate->transition_wait_ms)
             {
 #ifdef DEBUG                
                 Serial.println("doormon: door is definitely open");
@@ -105,7 +107,8 @@ static doormon_state_t do_update(doormon_t *pstate)
 
     case DM_DOOR_OPEN:
         if ((switch_update_state(&pstate->door_sensor0)==DOOR_CLOSED) &&
-            (switch_update_state(&pstate->test_button)==0))
+            (switch_update_state(&pstate->test_button)==0) &&
+            (pstate->test_flag==0))
         {
             next_state = DM_DOOR_CLOSING;
         }
@@ -118,9 +121,10 @@ static doormon_state_t do_update(doormon_t *pstate)
 
     case DM_DOOR_CLOSING:
         if ((switch_update_state(&pstate->door_sensor0)==DOOR_CLOSED) &&
-            (switch_update_state(&pstate->test_button)==0)) 
+            (switch_update_state(&pstate->test_button)==0) &&
+            (pstate->test_flag==0) )
         {
-            if (utils_get_elapsed_msec_and_reset(&pstate->event_time_ms) > DOORMON_DOOR_TRANSITION_MS)
+            if (utils_get_elapsed_msec_and_reset(&pstate->transition_time_ms) > pstate->transition_wait_ms)
             {
 #ifdef DEBUG                
                 Serial.println("doormon: door is definitely closed");
@@ -146,7 +150,8 @@ static doormon_state_t do_update(doormon_t *pstate)
 
 static void do_steadystate(doormon_t *pstate)
 {
-    long elapsed_ms;
+    pstate->state_elapsed_time_ms = utils_get_elapsed_msec_and_reset(&pstate->transition_time_ms);
+
     switch(pstate->curr_state)
     {
     case DM_DOOR_CLOSED:
@@ -160,10 +165,6 @@ static void do_steadystate(doormon_t *pstate)
     case DM_DOOR_OPEN:
         pstate->led_state = 1;
         
-        elapsed_ms = utils_get_elapsed_msec_and_reset(&pstate->event_time_ms);
-#ifdef DEBUG
-        Serial.println("door has been open " + String(elapsed_ms/1000.0) + " sec");
-#endif        
         break;
 
     case DM_DOOR_CLOSING:
@@ -185,24 +186,22 @@ static void do_transitions(doormon_t *pstate, doormon_state_t next_state)
     else
     {
         Serial.println(String(doormon_state_to_string(pstate->curr_state)) + "-->" + String(doormon_state_to_string(next_state)));
+
+        // always register time of transition
+        pstate->transition_time_ms = millis();
+        
         switch(next_state)
         {
         case DM_DOOR_CLOSED:
-            if (pstate->curr_state==DM_DOOR_OPEN)
-            {
-            }
             break;
             
         case DM_DOOR_OPENING:
-            pstate->event_time_ms = millis();
             break;
             
         case DM_DOOR_OPEN:
-            pstate->event_time_ms = millis();
             break;
             
         case DM_DOOR_CLOSING:
-            pstate->event_time_ms = millis();
             break;
 
         default:
@@ -240,4 +239,20 @@ const char* doormon_get_curr_state_as_string(const doormon_t *pstate)
 {
     doormon_state_t curr_state = pstate->curr_state;
     return doormon_state_to_string(curr_state);
+
+}
+
+void doormon_set_test_flag(doormon_t *pstate, int val)
+{
+    pstate->test_flag = val;
+}
+
+int doormon_get_test_flag(const doormon_t *pstate)
+{
+    return pstate->test_flag;
+}
+
+unsigned long doormon_get_elapsed_state_time_ms(const doormon_t *pstate)
+{
+    return pstate->state_elapsed_time_ms;
 }

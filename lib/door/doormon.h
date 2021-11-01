@@ -17,20 +17,29 @@ typedef enum
 
 typedef struct
 {
-    switch_t door_sensor0;
-    switch_t test_button;
+    // these three inputs are equivalent
+    switch_t door_sensor0; // 1
+    switch_t test_button; // 2
+    int test_flag; // 3
+
+    long int transition_wait_ms;
+
     int led_pin;
-    doormon_state_t curr_state;
-    long event_time_ms;
     int led_state;
+    doormon_state_t curr_state;
+    long int transition_time_ms;  // the clock at time of state transition
+    unsigned long state_elapsed_time_ms; // how long we've been in a particular state
 } doormon_t;
 
-#define DOORMON_DOOR_TRANSITION_MS    (5 * 1000)
+#define DOORMON_DOOR_TRANSITION_WAIT_MS    (5 * 1000)
 void doormon_init(doormon_t *pstate, int door_sensor_pin0, int test_button_pin, int led_pin);
 doormon_state_t doormon_update(doormon_t *pstate);
 
 const char* doormon_state_to_string(doormon_state_t state);
 const char* doormon_get_curr_state_as_string(const doormon_t *pstate);
 
+void doormon_set_test_flag(doormon_t *pstate, int val);
+int doormon_get_test_flag(const doormon_t *pstate);
+unsigned long doormon_get_elapsed_state_time_ms(const doormon_t *pstate);
 #endif // doormon_h
 
