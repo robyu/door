@@ -35,8 +35,8 @@ typedef struct
 void doormon_init(doormon_t *pstate, int door_sensor_pin0, int test_button_pin, int led_pin);
 doormon_state_t doormon_update(doormon_t *pstate);
 
-const char* doormon_state_to_string(doormon_state_t state);
-const char* doormon_get_curr_state_as_string(const doormon_t *pstate);
+const String doormon_state_to_string(doormon_state_t state);
+const String doormon_get_curr_state_as_string(const doormon_t *pstate);
 
 void doormon_set_test_flag(doormon_t *pstate, int val);
 int doormon_get_test_flag(const doormon_t *pstate);

@@ -1,6 +1,3 @@
-
-
-
 #include "Arduino.h"
 #include "WiFiClient.h"
 #include <DNSServer.h>            //Local DNS Server used for redirecting all requests to the configuration portal
@@ -11,10 +8,29 @@
 #include "wifimon.h"
 #include "switch.h"
 #include "utils.h"
+#include "enum_descr.h"
 
 #define DEBUG 1
 #define PRETEND_NETWORK_CONNECTED 0
 #define LED_COUNTER_THRESHOLD 2
+
+static enum_descr_t wifimon_state_descr[] =
+{
+    ENUM_DESCR_DECLARE(WM_DONT_USE),
+    ENUM_DESCR_DECLARE(WM_INIT),
+    ENUM_DESCR_DECLARE(WM_CHECK_RESET),
+    ENUM_DESCR_DECLARE(WM_RECONFIG),
+    ENUM_DESCR_DECLARE(WM_NOT_CONNECTED),
+    ENUM_DESCR_DECLARE(WM_CONNECTED),
+    ENUM_DESCR_DECLARE(WM_REBOOT),
+    ENUM_DESCR_DECLARE(WM_LAST_DONT_USE),
+    ENUM_DESCR_END
+};
+
+static String state_to_string(wifi_state_t state)
+{
+    return String(wifimon_state_descr[(int)state].pvalue_str);
+}
 
 static int wifi_is_connected(void)
 {

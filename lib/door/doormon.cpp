@@ -3,6 +3,7 @@
 #include "doormon.h"
 #include "switch.h"
 #include "utils.h"
+#include "enum_descr.h"
 
 #define DEBUG 1
 
@@ -12,27 +13,19 @@
 #define DOOR_OPEN   0
 #define DOOR_CLOSED 1
 
-typedef struct 
-{
-    int value;
-    const char *pvalue_str;
-} state_enum_descr_t;
-
 /*
 table for converting state enums to strings
 */
-#define STATE_ENUM_DECLARE(ENUM) {ENUM, #ENUM}
-#define STATE_ENUM_END {0, NULL}
-static state_enum_descr_t doormon_state_descr[] =
+static enum_descr_t doormon_state_descr[] =
 {
-    STATE_ENUM_DECLARE(DM_DONT_USE),
-    STATE_ENUM_DECLARE(DM_INIT),
-    STATE_ENUM_DECLARE(DM_DOOR_CLOSED),
-    STATE_ENUM_DECLARE(DM_DOOR_OPENING),
-    STATE_ENUM_DECLARE(DM_DOOR_OPEN),
-    STATE_ENUM_DECLARE(DM_DOOR_CLOSING),
-    STATE_ENUM_DECLARE(DM_LAST_DONT_USE),
-    STATE_ENUM_END
+    ENUM_DESCR_DECLARE(DM_DONT_USE),
+    ENUM_DESCR_DECLARE(DM_INIT),
+    ENUM_DESCR_DECLARE(DM_DOOR_CLOSED),
+    ENUM_DESCR_DECLARE(DM_DOOR_OPENING),
+    ENUM_DESCR_DECLARE(DM_DOOR_OPEN),
+    ENUM_DESCR_DECLARE(DM_DOOR_CLOSING),
+    ENUM_DESCR_DECLARE(DM_LAST_DONT_USE),
+    ENUM_DESCR_END
 };
 
 /*
@@ -141,7 +134,7 @@ static doormon_state_t do_update(doormon_t *pstate)
     default:
         //
         // shouldn't ever get here!
-        Serial.println(String("doormon:do_update illegal state ") + String(doormon_state_to_string(pstate->curr_state)));
+        Serial.println(String("doormon:do_update illegal state ") + doormon_state_to_string(pstate->curr_state));
         utils_restart();
     }
 
@@ -185,7 +178,7 @@ static void do_transitions(doormon_t *pstate, doormon_state_t next_state)
     }
     else
     {
-        Serial.println(String(doormon_state_to_string(pstate->curr_state)) + "-->" + String(doormon_state_to_string(next_state)));
+        Serial.println(doormon_state_to_string(pstate->curr_state) + "-->" + doormon_state_to_string(next_state));
 
         // always register time of transition
         pstate->transition_time_ms = millis();
@@ -207,7 +200,7 @@ static void do_transitions(doormon_t *pstate, doormon_state_t next_state)
         default:
             //
             // shouldn't ever get here!
-            Serial.println("doormon:do_transitions illegal state " + String(doormon_state_to_string(pstate->curr_state)));
+            Serial.println("doormon:do_transitions illegal state " + doormon_state_to_string(pstate->curr_state));
             utils_restart();
         }
         pstate->curr_state = next_state;
@@ -230,12 +223,12 @@ doormon_state_t doormon_update(doormon_t *pstate)
 }
 
 
-const char*  doormon_state_to_string(doormon_state_t state)
+const String  doormon_state_to_string(doormon_state_t state)
 {
-    return doormon_state_descr[(int)state].pvalue_str;
+    return String(doormon_state_descr[(int)state].pvalue_str);
 }
 
-const char* doormon_get_curr_state_as_string(const doormon_t *pstate)
+const String doormon_get_curr_state_as_string(const doormon_t *pstate)
 {
     doormon_state_t curr_state = pstate->curr_state;
     return doormon_state_to_string(curr_state);
