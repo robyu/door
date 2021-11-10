@@ -13,7 +13,7 @@ void utils_restart(void);
 
 #define UTILS_INT_ABS(x) ((x >= 0) ? x : -x)
 
-void utils_assert(char* pfilename, int line_number, int arg);
+void utils_assert(const char* pfilename, int line_number, int arg);
 #define UTILS_ASSERT(arg)  utils_assert(__FILE__,__LINE__,arg)
 
 

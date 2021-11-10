@@ -2,6 +2,8 @@
 #include <stdlib.h>
 #include <Arduino.h>
 #include <limits.h>
+#include "gpio_pins.h"
+#include "utils.h"
 
 /*
   reset the esp8266
@@ -21,17 +23,31 @@ not HIGH or LOW
 */
 void utils_set_led(int led_pin, int on_off)
 {
-    if (led_pin < 0)
+    int on_value = -1;
+    
+    // agh, fucking LEDs have different polarities
+    UTILS_ASSERT(LED_DOOR==LED_BUILTIN_ESP);
+    switch(led_pin)
     {
-        return;
+    case LED_BUILTIN_PCB:
+    case LED_DOOR:
+        on_value = LOW;
+        break;
+
+    case LED_WIFI:
+        on_value = HIGH;
+        break;
+    default:
+        UTILS_ASSERT(0);
     }
+
     if (on_off==1)
     {
-        digitalWrite(led_pin, LOW);
+        digitalWrite(led_pin, on_value);
     }
     else
     {
-        digitalWrite(led_pin, HIGH);
+        digitalWrite(led_pin, on_value ^ 0x1);
     }
 }
 
@@ -139,18 +155,29 @@ void utils_log(const char *fmt, ... )
 #endif
 }
 
-void utils_assert(char* pfilename, int line_number, int arg)
+void utils_assert(const char* pfilename, int line_number, int arg)
 {
-    if (arg==0)
+    int blink = 1;
+    if (arg)
+    {
+        return;
+    }
+
     {
         char tmp[128]; // resulting string limited to 128 chars
         char fmt[] = "assertion at %s:%d\n";
         sprintf(tmp, fmt, pfilename, line_number);
         Serial.print(tmp);
+        Serial.flush();
 
-        while(1)
-        {
-            ;
-        }
+
+    }
+    while(1)
+    {
+        digitalWrite(LED_BUILTIN_ESP, blink);
+        digitalWrite(LED_BUILTIN_PCB, blink);
+        digitalWrite(LED_WIFI, blink);
+        blink ^= 0x1;
+        delay(250);
     }
 }
