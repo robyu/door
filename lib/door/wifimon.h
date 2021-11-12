@@ -22,10 +22,8 @@ typedef enum
 typedef struct
 {
     wifi_state_t curr_state;
-    wifi_state_t debug_next_state;
     
     int led_pin;
-    int led_state;
     int led_counter;
     switch_t reset_button;
     long threshold_check_reset_ms;
@@ -37,7 +35,10 @@ typedef struct
     char pmqtt_server[WIFIMON_MAX_LEN_MQTT_SERVER];
     char pmqtt_port[WIFIMON_MAX_LEN_MQTT_PORT];
 
-    bool restart_after_config;
+    // for debugging
+    wifi_state_t debug_next_state;
+    bool enable_restart; // for testing
+    bool pretend_network_connected; // for testing
 } wifimon_t;
 
 
