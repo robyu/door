@@ -61,6 +61,8 @@ void wifimon_init(wifimon_t *pstate, int led_pin, int reset_button_pin)
     pstate->threshold_reboot_button_ms = 5000;
     pstate->threshold_reconfig_sec = 180; 
     pstate->threshold_not_connected_ms = 20000;
+
+    pstate->restart_after_config = true;
 }
 
 /*
@@ -75,7 +77,7 @@ static wifi_state_t do_update(wifimon_t *pstate)
     wifi_state_t next_state;
 
 #ifdef DEBUG
-    Serial.println("do_update: initial state: " + String(pstate->curr_state));
+    Serial.println("do_update: initial state: " + state_to_string(pstate->curr_state));
 #endif
 
     next_state = pstate->curr_state;
@@ -166,29 +168,46 @@ static wifi_state_t do_update(wifimon_t *pstate)
         }
         break;
     default:
-        Serial.println("wifimon::do_update illegal state " + String(pstate->curr_state));
+        Serial.println("wifimon::do_update illegal state " + state_to_string(pstate->curr_state));
         utils_restart();
     }
 
 #ifdef DEBUG
-    Serial.println("next_state: " + String(next_state));
+    Serial.println("next_state: " + state_to_string(next_state));
 #endif
+
+    //
+    // force transition?
+    if (pstate->debug_next_state != WM_DONT_USE)
+    {
+        next_state = pstate->debug_next_state;
+        pstate->debug_next_state = WM_DONT_USE;
+    }
     return next_state;
 }
 
-static void start_config_portal(void)
+
+static void start_config_portal(wifimon_t *pstate)
 {
     // see https://github.com/tzapu/WiFiManager/blob/master/examples/OnDemandConfigPortal/OnDemandConfigPortal.ino
             
     //Local intialization. Once its business is done, there is no need to keep it around
     WiFiManager wifiManager;
+#if 0
+    // id/name, placeholder/prompt, default, length
+    WiFiManagerParameter custom_mqtt_server("server", "mqtt server", pstate->pmqtt_server, WIFIMON_MAX_LEN_MQTT_SERVER);
+    wifiManager.addParameter(&custom_mqtt_server);
+    WiFiManagerParameter custom_mqtt_port("port", "mqtt port", pstate->pmqtt_port, WIFIMON_MAX_LEN_MQTT_PORT);
+    wifiManager.addParameter(&custom_mqtt_port);
+#endif    
+
 #ifdef DEBUG
     Serial.println("start_config_portal");
 #endif
     //sets timeout until configuration portal gets turned off
     //useful to make it all retry or go to sleep
     //in seconds
-    wifiManager.setTimeout(120);
+    wifiManager.setConfigPortalTimeout(pstate->threshold_reconfig_sec);
 
     //it starts an access point with the specified name
     //and goes into a blocking loop awaiting configuration
@@ -196,16 +215,27 @@ static void start_config_portal(void)
     //WITHOUT THIS THE AP DOES NOT SEEM TO WORK PROPERLY WITH SDK 1.5 , update to at least 1.5.1
     //WiFi.mode(WIFI_STA);
     
-    if (!wifiManager.startConfigPortal("door-config-ap")) {
+    bool is_connected = wifiManager.startConfigPortal("door-config");
+    if (is_connected==false) {
         Serial.println("  failed to connect and hit timeout");
-        delay(3000);
-        //reset and try again, or maybe put it to deep sleep
+    }
+    else
+    {
+#if 0
+        strncpy(pstate->pmqtt_server, custom_mqtt_server.getValue(), WIFIMON_MAX_LEN_MQTT_SERVER);
+        strncpy(pstate->pmqtt_port, custom_mqtt_port.getValue(), WIFIMON_MAX_LEN_MQTT_PORT);
+        Serial.println("\tmqtt_server : " + String(pstate->pmqtt_server));
+        Serial.println("\tmqtt_port : " + String(pstate->pmqtt_port));
+#endif
+    //if you get here you have connected to the WiFi
+        Serial.println("  connected...");
+    }
+    if (pstate->restart_after_config)
+    {
+        Serial.println("restart_after_config=true...restarting");
+        
         utils_restart();
     }
-
-    //if you get here you have connected to the WiFi
-    Serial.println("  connected...");
-    utils_restart();
 }
 
 static void do_transitions(wifimon_t *pstate, wifi_state_t next_state)
@@ -217,7 +247,7 @@ static void do_transitions(wifimon_t *pstate, wifi_state_t next_state)
     else
     {
 #ifdef DEBUG
-        Serial.println("do_transitions: " + String(pstate->curr_state) + "->" + String(next_state));
+        Serial.println("do_transitions: " + state_to_string(pstate->curr_state) + "->" + state_to_string(next_state));
 #endif
         switch(next_state)
         {
@@ -227,7 +257,7 @@ static void do_transitions(wifimon_t *pstate, wifi_state_t next_state)
             
         case WM_RECONFIG:
             utils_set_led(pstate->led_pin, 1);
-            start_config_portal();
+            start_config_portal(pstate);
             break;
 
         case WM_NOT_CONNECTED:
@@ -247,7 +277,7 @@ static void do_transitions(wifimon_t *pstate, wifi_state_t next_state)
 
         default:
             // shouldn't ever reach this point
-            Serial.println("wifimon::do_transitions illegal state " + String(pstate->curr_state));
+            Serial.println("wifimon::do_transitions illegal state " + state_to_string(pstate->curr_state));
             utils_restart();
             
         }
@@ -293,4 +323,9 @@ int wifimon_update(wifimon_t *pstate)
     do_steadystate(pstate);
 
     return (pstate->curr_state==WM_CONNECTED); // return connection state
+}
+
+void wifimon_force_transition(wifimon_t *pstate, wifi_state_t next_state)
+{
+    pstate->debug_next_state = next_state;
 }
