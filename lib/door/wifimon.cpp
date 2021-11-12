@@ -168,8 +168,6 @@ static wifi_state_t do_update(wifimon_t *pstate)
         UTILS_ASSERT(0);
     }
 
-    Serial.println("next_state: " + state_to_string(next_state));
-
     //
     // force transition?
     if (pstate->debug_next_state != WM_DONT_USE)
@@ -178,6 +176,7 @@ static wifi_state_t do_update(wifimon_t *pstate)
         next_state = pstate->debug_next_state;
         pstate->debug_next_state = WM_DONT_USE;
     }
+    Serial.println("next_state: " + state_to_string(next_state));
     return next_state;
 }
 
@@ -188,17 +187,15 @@ static void start_config_portal(wifimon_t *pstate)
             
     //Local intialization. Once its business is done, there is no need to keep it around
     WiFiManager wifiManager;
-#if 0
+
     // id/name, placeholder/prompt, default, length
     WiFiManagerParameter custom_mqtt_server("server", "mqtt server", pstate->pmqtt_server, WIFIMON_MAX_LEN_MQTT_SERVER);
     wifiManager.addParameter(&custom_mqtt_server);
     WiFiManagerParameter custom_mqtt_port("port", "mqtt port", pstate->pmqtt_port, WIFIMON_MAX_LEN_MQTT_PORT);
     wifiManager.addParameter(&custom_mqtt_port);
-#endif    
 
-#ifdef DEBUG
     Serial.println("start_config_portal");
-#endif
+
     //sets timeout until configuration portal gets turned off
     //useful to make it all retry or go to sleep
     //in seconds
@@ -216,13 +213,12 @@ static void start_config_portal(wifimon_t *pstate)
     }
     else
     {
-#if 0
         strncpy(pstate->pmqtt_server, custom_mqtt_server.getValue(), WIFIMON_MAX_LEN_MQTT_SERVER);
         strncpy(pstate->pmqtt_port, custom_mqtt_port.getValue(), WIFIMON_MAX_LEN_MQTT_PORT);
         Serial.println("\tmqtt_server : " + String(pstate->pmqtt_server));
         Serial.println("\tmqtt_port : " + String(pstate->pmqtt_port));
-#endif
-    //if you get here you have connected to the WiFi
+
+        //if you get here you have connected to the WiFi
         Serial.println("  connected...");
     }
     if (pstate->enable_restart)

@@ -81,7 +81,7 @@ void test_led_check_reset(void)
 
     // enter check_reset state 
     Serial.println("==========================");
-    Serial.println("forcing wifimon into CHECK_RESET for " + String(duration_ms) + "ms");
+    Serial.println("forcing wifimon into CHECK_RESET for " + String(duration_ms) + " ms");
     Serial.println("VERIFY LED state==fast blink");
     
     time0_ms = millis();
@@ -94,10 +94,38 @@ void test_led_check_reset(void)
     TEST_ASSERT_TRUE(true);
 }
 
+void test_led_connected(void)
+{
+    wifimon_t wifimon;
+    long unsigned time0_ms;
+    long unsigned  duration_ms = 5000;
+
+    wifimon_init(&wifimon, 
+                 LED_WIFI,
+                 BTN_RESET);
+    wifimon.enable_restart = false;
+    wifimon.pretend_network_connected = false;
+
+    // enter check_reset state 
+    Serial.println("==========================");
+    Serial.println("forcing wifimon into CONNECTED for " + String(duration_ms) + " ms");
+    Serial.println("VERIFY LED state==slow blink");
+    
+    time0_ms = millis();
+    while(millis() - time0_ms < duration_ms)
+    {
+        wifimon_force_transition(&wifimon, WM_CONNECTED);
+        wifimon_update(&wifimon);
+        delay(100);
+    }
+    TEST_ASSERT_TRUE(true);
+}
+
 void loop() {
     // RUN_TEST(test_open_ap_portal_then_quit);
-    // RUN_TEST(test_force_reconfig);
-    RUN_TEST(test_led_check_reset);
+    RUN_TEST(test_force_reconfig);
+    // RUN_TEST(test_led_check_reset);
+    // RUN_TEST(test_led_connected);
     
 
     UNITY_END();
