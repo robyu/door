@@ -3,12 +3,12 @@
 #include <DNSServer.h>            //Local DNS Server used for redirecting all requests to the configuration portal
 #include <ESP8266WebServer.h>     //Local WebServer used to serve the configuration portal
 #include <ESP8266WiFi.h>          //ESP8266 Core WiFi Library (you most likely already have this in your sketch)
-#include <WiFiManager.h>          //https://github.com/tzapu/WiFiManager WiFi Configuration Magic
 #include <assert.h>
 #include "wifimon.h"
 #include "switch.h"
 #include "utils.h"
 #include "enum_descr.h"
+#include "LittleFS.h"
 
 #define LED_SLOW_BLINK 10
 #define LED_FAST_BLINK  2   
@@ -45,9 +45,59 @@ static int wifi_is_connected(const wifimon_t *pstate)
     return (status==WL_CONNECTED);
 }
 
+#define MQTT_FNAME "/mqtt_params.txt"
+
+void wifimon_read_mqtt_params_from_file(char *pmqtt_server,
+                                        int len_server,
+                                        char *pmqtt_port,
+                                        int len_port)
+{
+    File file;
+    file = LittleFS.open(MQTT_FNAME, "r");
+    if (!file)
+    {
+        memset(pmqtt_server, 0, len_server * sizeof(char));
+        memset(pmqtt_port, 0, len_port * sizeof(char));
+    }
+    else
+    {
+        int numbytes;
+        numbytes = file.readBytesUntil('\n', pmqtt_server, len_server);
+        UTILS_ASSERT(numbytes < len_server);
+
+        numbytes = file.readBytesUntil('\n', pmqtt_port, len_port);
+        UTILS_ASSERT(numbytes < len_port);
+    }
+    return;
+}
+
+void wifimon_write_mqtt_params_to_file(char *pmqtt_server,
+                                       int len_server,
+                                       char *pmqtt_port,
+                                       int len_port)
+{
+    File file;
+    file = LittleFS.open(MQTT_FNAME, "w");
+    
+    if (!file)
+    {
+        Serial.println("Failed to open file " + String(MQTT_FNAME));
+        return;
+    }
+    else
+    {
+        UTILS_ASSERT((int)strlen(pmqtt_server) < len_server);
+        file.write(pmqtt_server, strlen(pmqtt_server)+1);
+
+        UTILS_ASSERT((int)strlen(pmqtt_port) < len_port);
+        file.write(pmqtt_port, strlen(pmqtt_port)+1);
+    }
+    return;
+}
+
 void wifimon_init(wifimon_t *pstate, int led_pin, int reset_button_pin)
 {
-    memset(pstate, 0, sizeof(*pstate));
+    //memset(pstate, 0, sizeof(*pstate));
     pstate->led_pin = led_pin;
 
     if (led_pin >= 0)
@@ -62,6 +112,11 @@ void wifimon_init(wifimon_t *pstate, int led_pin, int reset_button_pin)
     pstate->threshold_reconfig_sec = 180; 
     pstate->threshold_not_connected_ms = 20000;
 
+    // try to load mqtt parameters from filesystem
+    wifimon_read_mqtt_params_from_file(pstate->pmqtt_server,
+                                       WIFIMON_MAX_LEN_MQTT_SERVER,
+                                       pstate->pmqtt_port,
+                                       WIFIMON_MAX_LEN_MQTT_PORT);
     pstate->enable_restart = true;
 }
 
@@ -180,47 +235,37 @@ static wifi_state_t do_update(wifimon_t *pstate)
     return next_state;
 }
 
-
+// see https://github.com/tzapu/WiFiManager/blob/master/examples/OnDemandConfigPortal/OnDemandConfigPortal.ino
 static void start_config_portal(wifimon_t *pstate)
 {
-    // see https://github.com/tzapu/WiFiManager/blob/master/examples/OnDemandConfigPortal/OnDemandConfigPortal.ino
-            
-    //Local intialization. Once its business is done, there is no need to keep it around
-    WiFiManager wifiManager;
-
-    // id/name, placeholder/prompt, default, length
+    WiFiManager wifi_manager;
     WiFiManagerParameter custom_mqtt_server("server", "mqtt server", pstate->pmqtt_server, WIFIMON_MAX_LEN_MQTT_SERVER);
-    wifiManager.addParameter(&custom_mqtt_server);
     WiFiManagerParameter custom_mqtt_port("port", "mqtt port", pstate->pmqtt_port, WIFIMON_MAX_LEN_MQTT_PORT);
-    wifiManager.addParameter(&custom_mqtt_port);
 
-    Serial.println("start_config_portal");
+    wifi_manager.addParameter(&custom_mqtt_server);
+    wifi_manager.addParameter(&custom_mqtt_port);
 
     //sets timeout until configuration portal gets turned off
     //useful to make it all retry or go to sleep
     //in seconds
-    wifiManager.setConfigPortalTimeout(pstate->threshold_reconfig_sec);
+    wifi_manager.setConfigPortalTimeout(pstate->threshold_reconfig_sec);
 
-    //it starts an access point with the specified name
-    //and goes into a blocking loop awaiting configuration
-
-    //WITHOUT THIS THE AP DOES NOT SEEM TO WORK PROPERLY WITH SDK 1.5 , update to at least 1.5.1
-    //WiFi.mode(WIFI_STA);
-    
-    bool is_connected = wifiManager.startConfigPortal("door-config");
+    Serial.println("start_config_portal");
+    bool is_connected = wifi_manager.startConfigPortal("door-config");
     if (is_connected==false) {
         Serial.println("  failed to connect and hit timeout");
     }
-    else
-    {
-        strncpy(pstate->pmqtt_server, custom_mqtt_server.getValue(), WIFIMON_MAX_LEN_MQTT_SERVER);
-        strncpy(pstate->pmqtt_port, custom_mqtt_port.getValue(), WIFIMON_MAX_LEN_MQTT_PORT);
-        Serial.println("\tmqtt_server : " + String(pstate->pmqtt_server));
-        Serial.println("\tmqtt_port : " + String(pstate->pmqtt_port));
 
-        //if you get here you have connected to the WiFi
-        Serial.println("  connected...");
-    }
+    // save mqtt data
+    strncpy(pstate->pmqtt_server, custom_mqtt_server.getValue(), WIFIMON_MAX_LEN_MQTT_SERVER);
+    strncpy(pstate->pmqtt_port, custom_mqtt_port.getValue(), WIFIMON_MAX_LEN_MQTT_PORT);
+    Serial.println("\tmqtt_server : " + String(pstate->pmqtt_server));
+    Serial.println("\tmqtt_port : " + String(pstate->pmqtt_port));
+    wifimon_write_mqtt_params_to_file(pstate->pmqtt_server,
+                                      WIFIMON_MAX_LEN_MQTT_SERVER,
+                                      pstate->pmqtt_port,
+                                      WIFIMON_MAX_LEN_MQTT_PORT);
+    
     if (pstate->enable_restart)
     {
         Serial.println("enable_restart=true...restarting");

@@ -51,7 +51,7 @@ void wifiInfo(WiFiManager *wm){
 void test_open_ap_portal_then_quit(void)
 {
     WiFiManager wm;
-    WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP
+    WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP IS THIS NECESSARY?
     wm.debugPlatformInfo();
     wm.setConfigPortalTimeout(5); // return from config portal after N seconds, no matter what
     wifiInfo(&wm);
@@ -126,7 +126,15 @@ void loop() {
     RUN_TEST(test_force_reconfig);
     // RUN_TEST(test_led_check_reset);
     // RUN_TEST(test_led_connected);
-    
 
+// STOPPED HERE
+// run from first state to connected
+// verify mqtt parameters    
+
+// delete all stored parameters
+// then open config ap
+//  then verify parameters    
+    
+    
     UNITY_END();
 }

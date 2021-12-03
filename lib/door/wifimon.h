@@ -1,8 +1,10 @@
 #ifndef wifimon_h
 #define wifimon_h
 
+
 #include "Arduino.h"
 #include "switch.h"
+#include <WiFiManager.h>
 
 typedef enum
 {
@@ -35,6 +37,7 @@ typedef struct
     char pmqtt_server[WIFIMON_MAX_LEN_MQTT_SERVER];
     char pmqtt_port[WIFIMON_MAX_LEN_MQTT_PORT];
 
+    
     // for debugging
     wifi_state_t debug_next_state;
     bool enable_restart; // for testing
@@ -45,5 +48,16 @@ typedef struct
 void wifimon_init(wifimon_t *pstate, int led_pin, int reset_button_pin);
 int wifimon_update(wifimon_t *pstate);
 void wifimon_force_transition(wifimon_t *pstate, wifi_state_t next_state);
+
+void wifimon_write_mqtt_params_to_file(char *pmpqtt_server,
+                                       int len_server,
+                                       char *mpqtt_port,
+                                       int len_port);
+
+void wifimon_read_mqtt_params_from_file(char *pmpqtt_server,
+                                        int len_server,
+                                        char *mpqtt_port,
+                                        int len_port);
+
 #endif // switch_h
 
