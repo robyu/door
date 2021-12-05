@@ -121,20 +121,40 @@ void test_led_connected(void)
     TEST_ASSERT_TRUE(true);
 }
 
+void test_wifi_param_file_read_write(void)
+{
+    wifimon_t wifimon;
+    char pmqtt_server[] = "mqtt.somewhere.com";
+    char pmqtt_port[] = "8888";
+    char pmqtt_server2[WIFIMON_MAX_LEN_MQTT_SERVER];
+    char pmqtt_port2[WIFIMON_MAX_LEN_MQTT_PORT];
+
+    wifimon_init(&wifimon, 
+                 LED_WIFI,
+                 BTN_RESET);
+    wifimon.enable_restart = false;
+    wifimon.pretend_network_connected = false;
+
+
+    wifimon_write_mqtt_params_to_file(pmqtt_server,
+                                      WIFIMON_MAX_LEN_MQTT_SERVER,
+                                      pmqtt_port,
+                                      WIFIMON_MAX_LEN_MQTT_PORT);
+
+    wifimon_read_mqtt_params_from_file(pmqtt_server2,
+                                       WIFIMON_MAX_LEN_MQTT_SERVER,
+                                       pmqtt_port2,
+                                       WIFIMON_MAX_LEN_MQTT_PORT);
+    TEST_ASSERT_TRUE(String(pmqtt_server)==String(pmqtt_server2));
+    
+}
+
 void loop() {
-    // RUN_TEST(test_open_ap_portal_then_quit);
+    RUN_TEST(test_open_ap_portal_then_quit);
     RUN_TEST(test_force_reconfig);
-    // RUN_TEST(test_led_check_reset);
-    // RUN_TEST(test_led_connected);
+    RUN_TEST(test_led_check_reset);
+    RUN_TEST(test_led_connected);
+    RUN_TEST(test_wifi_param_file_read_write);
 
-// STOPPED HERE
-// run from first state to connected
-// verify mqtt parameters    
-
-// delete all stored parameters
-// then open config ap
-//  then verify parameters    
-    
-    
     UNITY_END();
 }

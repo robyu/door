@@ -113,6 +113,14 @@ void wifimon_init(wifimon_t *pstate, int led_pin, int reset_button_pin)
     pstate->threshold_not_connected_ms = 20000;
 
     // try to load mqtt parameters from filesystem
+    bool b = LittleFS.begin();
+    if(!b)
+    {
+        Serial.println("An Error has occurred while mounting LittleFS");
+        UTILS_ASSERT(0);
+    }
+
+        
     wifimon_read_mqtt_params_from_file(pstate->pmqtt_server,
                                        WIFIMON_MAX_LEN_MQTT_SERVER,
                                        pstate->pmqtt_port,
