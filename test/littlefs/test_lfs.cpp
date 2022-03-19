@@ -10,6 +10,7 @@ see https://www.mischianti.org/2021/04/01/esp32-integrated-littlefs-filesystem-5
 */
 void setup() {
     bool b;
+    UNITY_BEGIN();
     Serial.begin(115200);
 
     b = LittleFS.begin();

@@ -7,11 +7,10 @@
 #     pane
 
 
-
 # -d do not attach
 # -s session name
-#tmux new-session -d -s site
-tmux new-session -d -s site -n foo -c /Users/ryu/Documents/p2021/door/mqtt-test-stuff
+SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd)
+tmux new-session -d -s site -n foo -c "$SCRIPT_DIR"
 tmux split-window -v -d
 tmux split-window -h -d
 
