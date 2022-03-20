@@ -10,13 +10,13 @@ const char *password = "P00pietou";  // Enter WiFi password
 // MQTT Broker
 const char *public_mqtt_broker = "broker.emqx.io";
 const char *local_mqtt_broker = "ryu-mbp-2020.local";
-const char *topic = "esp8266/test";
+const char *topic = "home/garage/bigdoor";
 const int mqtt_port = 1883;
 
 //
 // pubsubclient api documentation here: https://pubsubclient.knolleary.net/api
 WiFiClient espClient;
-PubSubClient client(espClient);
+PubSubClient mqtt_client(espClient);
 
 void setup_wifi(void)
 {
@@ -32,7 +32,9 @@ void setup_wifi(void)
     Serial.println("Connected to the WiFi network");
 }
 
+unsigned int rx_length = 0;
 void rx_callback(char *topic, byte *payload, unsigned int length) {
+    rx_length = length;
     Serial.print("Message arrived in topic: ");
     Serial.println(topic);
     Serial.print("Message:");
@@ -49,19 +51,19 @@ void connect_mqtt_broker(const char *broker_addr, int mqtt_port, int max_attempt
     int count = 0;
     
     //connecting to a mqtt broker
-    client.setServer(broker_addr, mqtt_port);
-    client.setCallback(rx_callback);
-    while (!client.connected() && (count < max_attempts)) {
+    mqtt_client.setServer(broker_addr, mqtt_port);
+    mqtt_client.setCallback(rx_callback);
+    while (!mqtt_client.connected() && (count < max_attempts)) {
         String client_id = "esp8266-client-";
         Serial.printf("attempt %d\n",count);  // printf() works?!
         count++;
         client_id += String(WiFi.macAddress());
         Serial.printf("The client %s connects to mqtt broker %s\n", client_id.c_str(), broker_addr);
-        if (client.connect(client_id.c_str())) {
+        if (mqtt_client.connect(client_id.c_str())) {
             Serial.println("mqtt broker connected");
         } else {
             Serial.print("failed with state ");
-            Serial.println(client.state());
+            Serial.println(mqtt_client.state());
             delay(2000);
         }
     }
@@ -83,30 +85,55 @@ void setup(void) {
 void test_connect_public_broker(void)
 {
     connect_mqtt_broker(public_mqtt_broker, mqtt_port, 5);
-    TEST_ASSERT_TRUE(client.connected());
-    client.disconnect();
+    TEST_ASSERT_TRUE(mqtt_client.connected());
+    mqtt_client.disconnect();
 }
 
 void test_connect_local_broker(void)
 {
     connect_mqtt_broker(local_mqtt_broker, mqtt_port, 5);
-    if (client.connected()==false)
+    if (mqtt_client.connected()==false)
     {
         Serial.printf("\n");
         Serial.printf("could not connected to mqtt broker at %s\n", local_mqtt_broker);
         Serial.printf("did you start the broker docker image in ./mqtt-test-broker ?");
     }
-    TEST_ASSERT_TRUE(client.connected());
-    client.disconnect();
+    TEST_ASSERT_TRUE(mqtt_client.connected());
+    mqtt_client.disconnect();
 }
 
 void test_pub_sub(void)
 {
-    // publish and subscribe
-    client.publish(topic, "hello emqx");
-    client.subscribe(topic);
-    TEST_ASSERT_TRUE(1==1);
-    client.disconnect();
+    char topic[] = "home/garage/door";
+    boolean retval;
+    
+    connect_mqtt_broker(public_mqtt_broker, mqtt_port, 5);
+    TEST_ASSERT_TRUE(mqtt_client.connected());
+
+    // subscribe
+    retval=mqtt_client.subscribe(topic);
+    TEST_ASSERT_TRUE(retval);
+
+    //
+    // loop until I receive a topic message
+    // publish to same topic on first iteration
+    int count = 0;
+    int max_attempts = 100;
+    while ((rx_length <= 0) && (count < max_attempts))
+    {
+        if (count==0)
+        {
+            retval = mqtt_client.publish(topic, "hello hello");
+            TEST_ASSERT_TRUE(retval);
+        }
+        mqtt_client.loop();  // important!
+        Serial.printf("count %d\n",count);
+        count++;
+
+        delay(100);
+    }
+    TEST_ASSERT_TRUE(rx_length > 0);
+    mqtt_client.disconnect();
 }
 
 void test_smoke(void)
@@ -120,8 +147,8 @@ void loop() {
     RUN_TEST(test_smoke);
     RUN_TEST(test_connect_public_broker);
     RUN_TEST(test_connect_local_broker);
-    //RUN_TEST(test_pub_sub);
-    client.disconnect();
+    RUN_TEST(test_pub_sub);
+    mqtt_client.disconnect();
     UNITY_END();
 }
 
