@@ -73,20 +73,83 @@ void test_write_read(void)
 
     file = LittleFS.open(TESTFNAME,"r");
     numbytes = file.readBytesUntil('\n', pread_buf, sizeof(pread_buf));
-    pread_buf[numbytes] = '\n';
+    pread_buf[numbytes] = '\0';
 
-    Serial.println("write (" + String(pwrite_buf) + ")");
-    Serial.println("read (" + String(pread_buf) + ")");
-    Serial.println("len pwrite_buf= " + String(strlen(pwrite_buf)));
-    Serial.println("len pread_buf= " + String(strlen(pread_buf)));
+    // Serial.println("write (" + String(pwrite_buf) + ")");
+    // Serial.println("read (" + String(pread_buf) + ")");
+    // Serial.println("len pwrite_buf= " + String(strlen(pwrite_buf)));
+    // Serial.println("len pread_buf= " + String(strlen(pread_buf)));
+    Serial.printf("\n");
+    Serial.printf("wrote (%s)\n", pwrite_buf);
+    Serial.printf("read (%s)\n", pread_buf);
+    Serial.printf("len pwrite_buf= %d\n", strlen(pwrite_buf));
+    Serial.printf("len pread_buf=%d\n",strlen(pread_buf));
 
     TEST_ASSERT_TRUE(String(pwrite_buf)==String(pread_buf));
     LittleFS.remove(TESTFNAME);
 }
 
+/*
+to upload door/data/test_littlefs_uploaded.txt,
+first run:
+dpio run -t uploadfs
+
+then test_littlefs_uploaded.txt should appear on the esp8266 under /
+
+Notes: 
+you DO NOT need to set [platformio] data_dir. In fact, this setting seems to be ignored.
+
+*/
+#define UPLOADEDFNAME "/test_littlefs_uploaded.txt"
+void test_read_uploaded_file(void)
+{
+    File file;
+    boolean found_flag = false;
+    
+    bool exists = LittleFS.exists(UPLOADEDFNAME);
+    TEST_ASSERT_TRUE(exists==true);
+
+    file = LittleFS.open(UPLOADEDFNAME,"r");
+    Serial.printf("------------------\n");
+    while (file.available()) {
+        String line = file.readStringUntil('\n');
+        Serial.println(line);
+        if (line.startsWith(String("hello")))
+        {
+            found_flag |= true;
+        }
+    }
+    TEST_ASSERT_TRUE(found_flag);
+                                 
+/*
+    TODO:
+does platformio.ini [platformio] data_dir matter?
+test contents of file
+*/    
+    Serial.printf("------------------\n");
+    file.close();
+}
+void test_list_files(void)
+{
+    String str = "";
+
+    Dir dir = LittleFS.openDir("/");
+    while (dir.next()) {
+        Serial.printf("%s | %d\n", dir.fileName().c_str(), dir.fileSize());
+        // str += dir.fileName();
+        // str += " / ";
+        // str += dir.fileSize();
+        // str += "\r\n";
+    }
+    Serial.print(str);
+    TEST_ASSERT_TRUE(true);
+}
+
 void loop() {
-    RUN_TEST(test_write);
-    RUN_TEST(test_write_read);
+    // RUN_TEST(test_write);
+    //RUN_TEST(test_write_read);
+    RUN_TEST(test_read_uploaded_file);
+    //RUN_TEST(test_list_files);
     LittleFS.end();
     UNITY_END();
 }
