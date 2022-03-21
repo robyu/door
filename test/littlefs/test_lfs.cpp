@@ -4,6 +4,7 @@
 #include "LittleFS.h"
 
 #define TESTFNAME "/test_example.txt"
+#define UPLOADEDFNAME "/unit_tests.json"
 
 /*
 see https://www.mischianti.org/2021/04/01/esp32-integrated-littlefs-filesystem-5/
@@ -100,7 +101,6 @@ Notes:
 you DO NOT need to set [platformio] data_dir. In fact, this setting seems to be ignored.
 
 */
-#define UPLOADEDFNAME "/test_littlefs_uploaded.txt"
 void test_read_uploaded_file(void)
 {
     File file;
@@ -113,22 +113,19 @@ void test_read_uploaded_file(void)
     Serial.printf("------------------\n");
     while (file.available()) {
         String line = file.readStringUntil('\n');
+        line.trim();
         Serial.println(line);
-        if (line.startsWith(String("hello")))
+        if (line.startsWith(String("\"wifi")))
         {
             found_flag |= true;
         }
     }
     TEST_ASSERT_TRUE(found_flag);
                                  
-/*
-    TODO:
-does platformio.ini [platformio] data_dir matter?
-test contents of file
-*/    
     Serial.printf("------------------\n");
     file.close();
 }
+
 void test_list_files(void)
 {
     String str = "";
@@ -145,11 +142,32 @@ void test_list_files(void)
     TEST_ASSERT_TRUE(true);
 }
 
+void test_load_txt_into_buffer(void)
+{
+    File file;
+    String txt;
+    
+    bool exists = LittleFS.exists(UPLOADEDFNAME);
+    TEST_ASSERT_TRUE(exists==true);
+
+    file = LittleFS.open(UPLOADEDFNAME,"r");
+    Serial.printf("------------------\n");
+    while (file.available()) {
+        String line = file.readStringUntil('\n');
+        txt = txt + line;
+        Serial.println(line);
+    }
+    Serial.printf("------------------\n");
+    Serial.println(txt);
+    file.close();
+}
+
 void loop() {
-    // RUN_TEST(test_write);
-    //RUN_TEST(test_write_read);
+     RUN_TEST(test_write);
+    RUN_TEST(test_write_read);
     RUN_TEST(test_read_uploaded_file);
-    //RUN_TEST(test_list_files);
+    RUN_TEST(test_list_files);
+    //RUN_TEST(test_load_txt_into_buffer);
     LittleFS.end();
     UNITY_END();
 }
