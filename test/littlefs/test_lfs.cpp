@@ -4,7 +4,7 @@
 #include "LittleFS.h"
 
 #define TESTFNAME "/test_example.txt"
-#define UPLOADEDFNAME "/unit_tests.json"
+#define JSONFNAME "/unit_tests.json"
 
 /*
 see https://www.mischianti.org/2021/04/01/esp32-integrated-littlefs-filesystem-5/
@@ -106,10 +106,10 @@ void test_read_uploaded_file(void)
     File file;
     boolean found_flag = false;
     
-    bool exists = LittleFS.exists(UPLOADEDFNAME);
+    bool exists = LittleFS.exists(JSONFNAME);
     TEST_ASSERT_TRUE(exists==true);
 
-    file = LittleFS.open(UPLOADEDFNAME,"r");
+    file = LittleFS.open(JSONFNAME,"r");
     Serial.printf("------------------\n");
     while (file.available()) {
         String line = file.readStringUntil('\n');
@@ -147,10 +147,10 @@ void test_load_txt_into_buffer(void)
     File file;
     String txt;
     
-    bool exists = LittleFS.exists(UPLOADEDFNAME);
+    bool exists = LittleFS.exists(JSONFNAME);
     TEST_ASSERT_TRUE(exists==true);
 
-    file = LittleFS.open(UPLOADEDFNAME,"r");
+    file = LittleFS.open(JSONFNAME,"r");
     Serial.printf("------------------\n");
     while (file.available()) {
         String line = file.readStringUntil('\n');

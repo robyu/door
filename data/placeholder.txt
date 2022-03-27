@@ -1,0 +1,2 @@
+Files in this directory are uploaded to the esp8266 filesystem location "/"
+see upload_unit_test_data.py
