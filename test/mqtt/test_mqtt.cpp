@@ -2,33 +2,95 @@
 #include <unity.h>
 #include <ESP8266WiFi.h>
 #include <PubSubClient.h>
+#include "json_config.h"
 
-// WiFi
-const char *ssid = "sleestak"; // Enter your WiFi name
-const char *password = "P00pietou";  // Enter WiFi password
+#define JSONFNAME "/unit_tests.json"
 
-// MQTT Broker
-const char *public_mqtt_broker = "broker.emqx.io";
-const char *local_mqtt_broker = "ryu-mbp-2020.local";
-const char *topic = "home/garage/bigdoor";
-const int mqtt_port = 1883;
+
+// MQTT Broker Parameters
+char public_mqtt_broker[1024];
+char local_mqtt_broker[1024];
+char mqtt_topic[1024];
+int mqtt_port;
 
 //
 // pubsubclient api documentation here: https://pubsubclient.knolleary.net/api
 WiFiClient espClient;
 PubSubClient mqtt_client(espClient);
 
+void get_wifi_credential(const char *fname, char *ssid_ptr, size_t len_ssid, char *pwd_ptr, size_t len_pwd)
+{
+    DynamicJsonDocument json(1024);
+    jc_get_config_from_file(fname, &json);
+    
+    Serial.printf("ssid=(%s)\n",
+                  (const char *)json["wifi_access"]["ssid"]);
+
+    TEST_ASSERT_TRUE(strlen((const char *)json["wifi_access"]["ssid"]) < len_ssid);
+    strncpy(ssid_ptr,
+            json["wifi_access"]["ssid"].as<const char *>(),
+            len_ssid);
+
+    TEST_ASSERT_TRUE(strlen((const char *)json["wifi_access"]["pwd"]) < len_pwd);
+    strncpy(pwd_ptr,
+            json["wifi_access"]["pwd"].as<const char *>(),
+            len_pwd);
+}
+
+void get_broker_params(const char *fname,
+                       char *public_mqtt_broker,
+                       char *local_mqtt_broker,
+                       size_t max_len_broker,
+                       char *topic,
+                       size_t max_len_topic,
+                       int *mqtt_port_pntr)
+{
+    DynamicJsonDocument json(1024);
+    const char *pc;
+    int i;
+    
+    jc_get_config_from_file(fname, &json);
+
+    pc = json["test_mqtt"]["public_mqtt_broker"];
+    TEST_ASSERT_TRUE(strlen(pc) < max_len_broker);
+    strncpy(public_mqtt_broker, pc,  max_len_broker);
+    Serial.printf("public mqtt broker = (%s)\n", public_mqtt_broker);
+
+    pc = json["test_mqtt"]["local_mqtt_broker"];
+    TEST_ASSERT_TRUE(strlen(pc) < max_len_broker);
+    strncpy(local_mqtt_broker, pc,  max_len_broker);
+    Serial.printf("local mqtt broker = (%s)\n", local_mqtt_broker);
+    
+    i = json["test_mqtt"]["mqtt_port"].as<int>();
+    *mqtt_port_pntr = i;
+    Serial.printf("mqtt port = %d\n", *mqtt_port_pntr);
+
+    pc = json["test_mqtt"]["topic"];
+    TEST_ASSERT_TRUE(strlen(pc) < max_len_topic);
+    strncpy(topic, pc,  max_len_topic);
+    Serial.printf("topic = (%s)\n", topic);
+    
+}
+
 void setup_wifi(void)
 {
     int max_attempts = 20;
     int count=0;
-    // connecting to a WiFi network
-    WiFi.begin(ssid, password);
+    char ssid_ptr[256];
+    char pwd_ptr[256];
+    get_wifi_credential(JSONFNAME, ssid_ptr,sizeof(ssid_ptr),pwd_ptr,sizeof(pwd_ptr));
+    WiFi.begin(ssid_ptr, pwd_ptr);
     while ((WiFi.status() != WL_CONNECTED) && (count < max_attempts)) {
         delay(500);
         Serial.printf("Connecting to WiFi (attempt %d)\n",count);
         count++;
     }
+    if (WiFi.status() != WL_CONNECTED)
+    {
+        Serial.println("WiFi setup FAILED");
+    }
+    TEST_ASSERT_TRUE(WiFi.status() == WL_CONNECTED);
+
     Serial.println("Connected to the WiFi network");
 }
 
@@ -80,6 +142,15 @@ void setup(void) {
         // no point in continuing
         TEST_ABORT();
     }
+
+    get_broker_params(JSONFNAME,
+                      public_mqtt_broker,
+                      local_mqtt_broker,
+                      sizeof(public_mqtt_broker),
+                      mqtt_topic,
+                      sizeof(mqtt_topic),
+                      &mqtt_port);
+                      
 }
 
 void test_connect_public_broker(void)
@@ -95,9 +166,11 @@ void test_connect_local_broker(void)
     if (mqtt_client.connected()==false)
     {
         Serial.printf("\n");
+        Serial.printf("===================================\n");
         Serial.printf("could not connected to mqtt broker at %s\n", local_mqtt_broker);
         Serial.printf("did you start the broker docker image in ./mqtt-test-broker ?");
     }
+
     TEST_ASSERT_TRUE(mqtt_client.connected());
     mqtt_client.disconnect();
 }
