@@ -1,0 +1,70 @@
+{
+    "homie":
+    {
+        "devices":   ["garage-detector"],
+        
+        "garage-detector":
+        {
+            "$homie": "v4.0.0",
+            "$name": "garage door detector",
+            "$state": "ready",
+            "$nodes": ["door-detector","reset"],
+            "$extensions": "",
+            "$implementation": "GITREV",
+            "nodes-array":
+            [
+                {
+                    "door-detector":
+                    {
+                        "$name": "door state detector",
+                        "$type": "reed-switch",
+                        "$properties": ["door-status","open-duration"],
+                        "properties-array":
+                        [
+                            {
+                                "door-status":
+                                {
+                                    "$name": "door-state",
+                                    "$datatype": "enum:open,closed",
+                                    "$settable": "false",
+                                    "$retained": "true"
+                                }
+                            },
+                            {
+                                "open-duration":
+                                {
+                                    "$name": "open-duration",
+                                    "$datatype": "float",
+                                    "$settable": "false",
+                                    "$retained": "true",
+                                    "$unit": "minutes"
+                                }
+                            }
+
+                        ]
+                    },
+                    "reset":
+                    {
+                        "$name": "reset switch",
+                        "$type": "pin",
+                        "$properties": ["reset-now"],
+                        "properties-array":
+                        [
+                            {
+                                "reset-now":
+                                {
+                                    "$name": "reset-switch",
+                                    "$datatype": "boolean",
+                                    "$settable": "true",
+                                    "$retained": "false",
+                                    "$unit": "minutes"
+                                }
+                            }
+                        ]
+                    }
+                }
+            ]
+        }
+        
+    }
+}
