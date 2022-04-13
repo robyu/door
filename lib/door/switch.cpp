@@ -2,7 +2,6 @@
 #include "Arduino.h"
 #include <assert.h>
 #include "debounce.h"
-#include "switch.h"
 
 
 
@@ -36,7 +35,7 @@ int switch_update_state(switch_t *pstate)
     return switch_is_closed;
 }
 
-long switch_get_state_duration(switch_t *pstate)
+long switch_get_state_duration_ms(switch_t *pstate)
 {
     long duration = millis() - pstate->state_change_time;
     if (duration < 0)

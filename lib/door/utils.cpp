@@ -38,6 +38,7 @@ void utils_set_led(int led_pin, int on_off)
         on_value = HIGH;
         break;
     default:
+        Serial.println("unknown LED pin " + String(led_pin));
         UTILS_ASSERT(0);
     }
 
@@ -172,6 +173,11 @@ void utils_assert(const char* pfilename, int line_number, int arg)
 
 
     }
+
+    pinMode(LED_DOOR, OUTPUT);
+    pinMode(LED_BUILTIN_PCB, OUTPUT);
+    pinMode(LED_WIFI, OUTPUT);
+
     while(1)
     {
         digitalWrite(LED_BUILTIN_ESP, blink);

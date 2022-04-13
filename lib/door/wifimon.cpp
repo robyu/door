@@ -164,7 +164,7 @@ static wifi_state_t do_update(wifimon_t *pstate)
         else
         {
             // button is DOWN
-            if (switch_get_state_duration(&pstate->reset_button) >= pstate->threshold_check_reset_ms)
+            if (switch_get_state_duration_ms(&pstate->reset_button) >= pstate->threshold_check_reset_ms)
             {
                 // long press -> go to reconfig
                 // transition:  open config portal
@@ -188,23 +188,6 @@ static wifi_state_t do_update(wifimon_t *pstate)
             // transition: light up indicator LED
             next_state = WM_CONNECTED;
         }
-        else
-        {
-            long duration = utils_get_elapsed_msec_and_reset(&pstate->start_time);
-            if (duration > pstate->threshold_not_connected_ms)
-            {
-                // failed to connect wifi in time, so reboot
-                next_state = WM_REBOOT;
-            }
-            if ((switch_update_state(&pstate->reset_button)==1) &&
-                (switch_get_state_duration(&pstate->reset_button) >= pstate->threshold_reboot_button_ms))
-            {
-                // reset button held down, so reboot
-                Serial.println("RESET button held down: reboot");
-                next_state = WM_REBOOT;
-                
-            }
-        }
         break;
 
     case WM_CONNECTED:
@@ -212,14 +195,6 @@ static wifi_state_t do_update(wifimon_t *pstate)
         if (wifi_is_connected(pstate)==0)
         {
             next_state = WM_NOT_CONNECTED;
-        }
-        if ((switch_update_state(&pstate->reset_button)==1) &&
-            (switch_get_state_duration(&pstate->reset_button) >= pstate->threshold_reboot_button_ms))
-        {
-            // reset button held down, so reboot
-            Serial.println("RESET button held down: reboot");
-            next_state = WM_REBOOT;
-            
         }
         break;
 

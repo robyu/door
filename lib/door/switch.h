@@ -15,7 +15,7 @@ typedef struct
 
 void switch_init(switch_t *pstate, int pin);
 int switch_update_state(switch_t *pstate);
-long switch_get_state_duration(switch_t *pstate);
+long switch_get_state_duration_ms(switch_t *pstate);
 void switch_reset_duration(switch_t *pstate);
 
 #endif // switch_h
