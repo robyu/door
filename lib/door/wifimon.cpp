@@ -139,7 +139,7 @@ static wifi_state_t do_update(wifimon_t *pstate)
 {
     wifi_state_t next_state;
 
-    Serial.println("do_update: initial state: " + state_to_string(pstate->curr_state));
+    //Serial.println("do_update: initial state: " + state_to_string(pstate->curr_state));
 
     next_state = pstate->curr_state;
     switch(pstate->curr_state)
@@ -149,8 +149,8 @@ static wifi_state_t do_update(wifimon_t *pstate)
         break;
 
     case WM_CHECK_RESET:
-        Serial.println("WM_CHECK_RESET_STATE");
-        Serial.println("  reset button = " + String(switch_update_state(&pstate->reset_button)));
+        //Serial.println("WM_CHECK_RESET_STATE");
+        //Serial.println("  reset button = " + String(switch_update_state(&pstate->reset_button)));
 
         if ((switch_update_state(&pstate->reset_button)==0) &&
             (utils_get_elapsed_msec_and_reset(&pstate->start_time) > 2 * pstate->threshold_check_reset_ms)) 
@@ -182,7 +182,7 @@ static wifi_state_t do_update(wifimon_t *pstate)
 
     case WM_NOT_CONNECTED:
         // see https://www.arduino.cc/en/Reference/WiFiStatus
-        Serial.println("WiFi.status = " + String(WiFi.status()));
+        //Serial.println("WiFi.status = " + String(WiFi.status()));
         if (wifi_is_connected(pstate)==1)
         {
             // transition: light up indicator LED
@@ -191,7 +191,7 @@ static wifi_state_t do_update(wifimon_t *pstate)
         break;
 
     case WM_CONNECTED:
-        Serial.println("WiFi.status = " + String(WiFi.status()));
+        //Serial.println("WiFi.status = " + String(WiFi.status()));
         if (wifi_is_connected(pstate)==0)
         {
             next_state = WM_NOT_CONNECTED;
@@ -210,11 +210,11 @@ static wifi_state_t do_update(wifimon_t *pstate)
     // force transition?
     if (pstate->debug_next_state != WM_DONT_USE)
     {
-        Serial.println("wifimon: forcing next state = " + state_to_string(pstate->debug_next_state));
+        //Serial.println("wifimon: forcing next state = " + state_to_string(pstate->debug_next_state));
         next_state = pstate->debug_next_state;
         pstate->debug_next_state = WM_DONT_USE;
     }
-    Serial.println("next_state: " + state_to_string(next_state));
+    //Serial.println("next_state: " + state_to_string(next_state));
     return next_state;
 }
 
@@ -265,7 +265,7 @@ static void do_transitions(wifimon_t *pstate, wifi_state_t next_state)
     }
     else
     {
-        Serial.println("do_transitions: " + state_to_string(pstate->curr_state) + "->" + state_to_string(next_state));
+        //Serial.println("do_transitions: " + state_to_string(pstate->curr_state) + "->" + state_to_string(next_state));
         switch(next_state)
         {
         case WM_INIT:

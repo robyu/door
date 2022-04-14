@@ -19,6 +19,7 @@ void setup() {
 
 void test_force_reconfig(void)
 {
+    WiFiManager wm;
     wifimon_init(&wifimon_state,
                  LED_WIFI,
                  BTN_RESET);
@@ -35,17 +36,18 @@ void test_force_reconfig(void)
 
     wifimon_update(&wifimon_state);
 
-    //
-    // if we got this far, we passed
-    TEST_ASSERT_TRUE(true);
+    TEST_ASSERT_TRUE(wm.getWiFiIsSaved()==1);
 }
 
 void wifiInfo(WiFiManager *wm){
-  WiFi.printDiag(Serial);
-  Serial.println("SAVED: " + (String)wm->getWiFiIsSaved() ? "YES" : "NO");
-  Serial.println("SSID: " + (String)wm->getWiFiSSID());
-  Serial.println("PASS: " + (String)wm->getWiFiPass());
-  Serial.println("Connected: " + String(WiFi.status()==WL_CONNECTED));
+    Serial.println("====================================");
+    WiFi.printDiag(Serial);
+    Serial.println("-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=");
+    Serial.println("SAVED: " + String(wm->getWiFiIsSaved() ));
+    Serial.println("SSID: " + String(wm->getWiFiSSID()) );
+    Serial.println("PASS: " + String(wm->getWiFiPass()) );
+    Serial.println("Connected: " + String(WiFi.status()==WL_CONNECTED));
+    Serial.println("====================================");
 }
 
 void test_open_ap_portal_then_quit(void)
@@ -57,8 +59,9 @@ void test_open_ap_portal_then_quit(void)
     wifiInfo(&wm);
     wm.startConfigPortal("door-config");
 
-    // if we get this far, the test passed
-    TEST_ASSERT_TRUE(true);
+    wifiInfo(&wm);
+
+    TEST_ASSERT_TRUE(wm.getWiFiIsSaved()==1);
 }
 
     /*
@@ -69,6 +72,7 @@ void test_open_ap_portal_then_quit(void)
     */
 void test_led_check_reset(void)
 {
+    WiFiManager wm;
     wifimon_t wifimon;
     long unsigned time0_ms;
     long unsigned  duration_ms = 5000;
@@ -91,7 +95,7 @@ void test_led_check_reset(void)
         wifimon_update(&wifimon);
         delay(100);
     }
-    TEST_ASSERT_TRUE(true);
+    TEST_ASSERT_TRUE(wm.getWiFiIsSaved()==1);
 }
 
 void test_led_connected(void)
@@ -107,6 +111,7 @@ void test_led_connected(void)
     wifimon.pretend_network_connected = false;
 
     // enter check_reset state 
+    Serial.println("");
     Serial.println("==========================");
     Serial.println("forcing wifimon into CONNECTED for " + String(duration_ms) + " ms");
     Serial.println("VERIFY LED state==slow blink");

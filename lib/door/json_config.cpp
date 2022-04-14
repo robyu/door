@@ -5,7 +5,7 @@
 #include "LittleFS.h"
 #include "json_config.h"
 
-void jc_get_config_from_file(const char *fname_ptr, DynamicJsonDocument *doc_ptr)
+void jc_get_config_from_file(const char *fname_ptr, JsonDocument *doc_ptr)
 {
     String txt;
     File file;
