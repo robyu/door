@@ -16,7 +16,7 @@ int mqtt_port;
 //
 // pubsubclient api documentation here: https://pubsubclient.knolleary.net/api
 WiFiClient espClient;
-PubSubClient mqtt_client(espClient);
+PubSubClient *pmqtt_client = new PubSubClient(espClient);
 
 void get_wifi_credential(const char *fname, char *ssid_ptr, size_t len_ssid, char *pwd_ptr, size_t len_pwd)
 {
@@ -113,19 +113,19 @@ void connect_mqtt_broker(const char *broker_addr, int mqtt_port, int max_attempt
     int count = 0;
     
     //connecting to a mqtt broker
-    mqtt_client.setServer(broker_addr, mqtt_port);
-    mqtt_client.setCallback(rx_callback);
-    while (!mqtt_client.connected() && (count < max_attempts)) {
+    pmqtt_client->setServer(broker_addr, mqtt_port);
+    pmqtt_client->setCallback(rx_callback);
+    while (!pmqtt_client->connected() && (count < max_attempts)) {
         String client_id = "esp8266-client-";
         Serial.printf("attempt %d\n",count);  // printf() works?!
         count++;
         client_id += String(WiFi.macAddress());
         Serial.printf("The client %s connects to mqtt broker %s\n", client_id.c_str(), broker_addr);
-        if (mqtt_client.connect(client_id.c_str())) {
+        if (pmqtt_client->connect(client_id.c_str())) {
             Serial.println("mqtt broker connected");
         } else {
             Serial.print("failed with state ");
-            Serial.println(mqtt_client.state());
+            Serial.println(pmqtt_client->state());
             delay(2000);
         }
     }
@@ -156,14 +156,14 @@ void setup(void) {
 void test_connect_public_broker(void)
 {
     connect_mqtt_broker(public_mqtt_broker, mqtt_port, 5);
-    TEST_ASSERT_TRUE(mqtt_client.connected());
-    mqtt_client.disconnect();
+    TEST_ASSERT_TRUE(pmqtt_client->connected());
+    pmqtt_client->disconnect();
 }
 
 void test_connect_local_broker(void)
 {
     connect_mqtt_broker(local_mqtt_broker, mqtt_port, 5);
-    if (mqtt_client.connected()==false)
+    if (pmqtt_client->connected()==false)
     {
         Serial.printf("\n");
         Serial.printf("===================================\n");
@@ -171,8 +171,8 @@ void test_connect_local_broker(void)
         Serial.printf("did you start the broker docker image in ./mqtt-test-broker ?");
     }
 
-    TEST_ASSERT_TRUE(mqtt_client.connected());
-    mqtt_client.disconnect();
+    TEST_ASSERT_TRUE(pmqtt_client->connected());
+    pmqtt_client->disconnect();
 }
 
 void test_pub_sub(void)
@@ -181,10 +181,10 @@ void test_pub_sub(void)
     boolean retval;
     
     connect_mqtt_broker(public_mqtt_broker, mqtt_port, 5);
-    TEST_ASSERT_TRUE(mqtt_client.connected());
+    TEST_ASSERT_TRUE(pmqtt_client->connected());
 
     // subscribe
-    retval=mqtt_client.subscribe(topic);
+    retval=pmqtt_client->subscribe(topic);
     TEST_ASSERT_TRUE(retval);
 
     //
@@ -196,17 +196,17 @@ void test_pub_sub(void)
     {
         if (count==0)
         {
-            retval = mqtt_client.publish(topic, "hello hello");
+            retval = pmqtt_client->publish(topic, "hello hello");
             TEST_ASSERT_TRUE(retval);
         }
-        mqtt_client.loop();  // important!
+        pmqtt_client->loop();  // important!
         Serial.printf("count %d\n",count);
         count++;
 
         delay(100);
     }
     TEST_ASSERT_TRUE(rx_length > 0);
-    mqtt_client.disconnect();
+    pmqtt_client->disconnect();
 }
 
 void test_smoke(void)
@@ -221,7 +221,7 @@ void loop() {
     RUN_TEST(test_connect_public_broker);
     RUN_TEST(test_connect_local_broker);
     RUN_TEST(test_pub_sub);
-    mqtt_client.disconnect();
+    pmqtt_client->disconnect();
     UNITY_END();
 }
 
