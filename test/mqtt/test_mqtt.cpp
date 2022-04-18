@@ -15,8 +15,8 @@ int mqtt_port;
 
 //
 // pubsubclient api documentation here: https://pubsubclient.knolleary.net/api
-WiFiClient espClient;
-PubSubClient *pmqtt_client = new PubSubClient(espClient);
+WiFiClient eth_client;
+PubSubClient *pmqtt_client = new PubSubClient(eth_client);
 
 void get_wifi_credential(const char *fname, char *ssid_ptr, size_t len_ssid, char *pwd_ptr, size_t len_pwd)
 {
@@ -99,7 +99,9 @@ void rx_callback(char *topic, byte *payload, unsigned int length) {
     rx_length = length;
     Serial.print("Message arrived in topic: ");
     Serial.println(topic);
-    Serial.print("Message:");
+    Serial.print("Message 0:");
+
+    // the payload is not null terminated, so you can't treat it like a string
     for (unsigned int i = 0; i < length; i++) {
         Serial.print((char) payload[i]);
     }
@@ -129,6 +131,7 @@ void connect_mqtt_broker(const char *broker_addr, int mqtt_port, int max_attempt
             delay(2000);
         }
     }
+    Serial.printf("Connection state = (%s) after (%d) attempts\n", String(pmqtt_client->connected()).c_str(), count);
 }
 
 void setup(void) {
@@ -185,6 +188,7 @@ void test_pub_sub(void)
 
     // subscribe
     retval=pmqtt_client->subscribe(topic);
+    Serial.printf("subscribed to (%s) returned %d\n",topic, int(retval));
     TEST_ASSERT_TRUE(retval);
 
     //
