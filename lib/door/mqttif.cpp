@@ -1,6 +1,7 @@
 #include "Arduino.h"
 #include "mqttif.h"
 #include "utils.h"
+#include <ESP8266WiFi.h>
 
 void mqttif_set_default_config(mqttif_config_t *pconfig, const char *pbroker_addr, int mqtt_port)
 {
@@ -21,6 +22,7 @@ copy rx topic + payload into prx_msgs array
 */
 void rx_callback(char *ptopic, byte *ppayload, unsigned int length)
 {
+#if 0    
     mqttif_t *p;
     UTILS_ASSERT(pmqttif_global!=NULL);
     p = pmqttif_global;
@@ -49,22 +51,38 @@ void rx_callback(char *ptopic, byte *ppayload, unsigned int length)
         p->num_rx_msgs++;
     }
     return;
+#endif    
 }
 
-static bool connect_mqtt_broker(mqttif_t *p)
+bool connect_mqtt_broker(mqttif_t *p)
 {
     int count = 0;
     PubSubClient *pmqtt_client = p->pmqtt_client;
     mqttif_config_t *pconfig = &p->config;
     
+    Serial.printf("connect_mqtt_broker: WiFi.status() = %d\n",(int)(WiFi.status()==WL_CONNECTED));
+
+    Serial.printf("WiFi.macAddress() = %s\n",String(WiFi.macAddress()).c_str());
+
+    /*--------------------------------------------------------*/
+    Serial.printf("pmqtt_client=%p\n",(void *)pmqtt_client);
+    Serial.printf("pmqttif_global->pmqtt_client=%p\n",(void *)pmqttif_global->pmqtt_client);
+
+
+    Serial.printf("0 connected() = %d\n", (int) (pmqttif_global->pmqtt_client->connected()) );
+    Serial.printf("1 connected() = %d\n", (int) (pmqtt_client->connected()) );
+    
+    UTILS_ASSERT(0);
+    
     //connecting to a mqtt broker
     // usually we need only 1 attempt
     while (!pmqtt_client->connected() && (count < pconfig->max_num_connect_attempts)) {
-        String client_id = "esp8266-client-";
+        Serial.printf("attempt %d\n",count);  
         count++;
-        client_id += String(WiFi.macAddress());
-        Serial.printf("Attemping connection: client %s -> mqtt broker %s\n", client_id.c_str(), pconfig->pbroker_addr);
-        if (pmqtt_client->connect(client_id.c_str())) {
+        UTILS_ASSERT(0);
+        //Serial.printf("Attemping connection: client %s -> mqtt broker %s\n", client_id.c_str(), pconfig->pbroker_addr);
+        if (pmqtt_client->connect("esp8266"))
+        {
             Serial.printf("mqtt broker connected after %d attempts\n", count);
         } else {
             Serial.printf("failed with state (%s)\n", String(pmqtt_client->state()).c_str());
@@ -75,19 +93,59 @@ static bool connect_mqtt_broker(mqttif_t *p)
     return pmqtt_client->connected();
 }
 
+void connect_mqtt_broker_simple(PubSubClient *pmqtt_client)
+{
+    
+    Serial.printf("connect_mqtt_broker: WiFi.status() = %d\n",(int)(WiFi.status()==WL_CONNECTED));
+
+    Serial.printf("WiFi.macAddress() = %s\n",String(WiFi.macAddress()).c_str());
+
+    /*--------------------------------------------------------*/
+    Serial.printf("pmqtt_client=%p\n",(void *)pmqtt_client);
+    Serial.printf("pmqttif_global->pmqtt_client=%p\n",(void *)pmqttif_global->pmqtt_client);
+
+
+    Serial.printf("0 connected() = %d\n", (int) (pmqttif_global->pmqtt_client->connected()) );
+    Serial.printf("1 connected() = %d\n", (int) (pmqtt_client->connected()) );
+    
+    UTILS_ASSERT(0);
+    
+}
+
+/*
+PubSubClient seems to want the object to be global
+Otherwise it crashes w/ stack trace when I call connect()
+*/
+static WiFiClient eth_client;
+static PubSubClient *pmqtt_client = new PubSubClient(eth_client);
 
 void mqttif_init(mqttif_t *p, const mqttif_config_t *pconfig)
 {
     UTILS_ZERO_STRUCT(p);
-    p->config = *pconfig;
 
-    p->pmqtt_client = new PubSubClient(p->eth_client);
-    pmqttif_global = p;
-    p->pmqtt_client->setServer(pconfig->pbroker_addr, pconfig->mqtt_port);
-    p->pmqtt_client->setCallback(rx_callback);
+    UTILS_ASSERT(MQTT_MAX_PACKET_SIZE >= MQTTIF_MAX_LEN_STR);
+    p->config = *pconfig;
+    p->pmqtt_client = pmqtt_client;
+
+    Serial.printf("mqttif_init: broker addr=%s\n",pconfig->pbroker_addr);
+    Serial.printf("mqttif_init: port=%d\n",pconfig->mqtt_port);
+    pmqtt_client->setServer(pconfig->pbroker_addr, pconfig->mqtt_port);
+    pmqtt_client->setCallback(rx_callback);
+
+
+    {
+        //bool is_connected = p->pmqtt_client->connected();
+        Serial.printf("pmqtt_client=%p\n",(void *)p->pmqtt_client);
+        Serial.printf("state=%d\n",p->pmqtt_client->state());
+
+        bool retval = p->pmqtt_client->connect("esp8266");
+        Serial.printf("connect()=%d\n",(int)retval);
+    }
+    UTILS_ASSERT(0);
+
     
-    // try to connect, but it's not a big deal if connection fails
-    connect_mqtt_broker(p);
+
+
 }
 
 bool mqttif_is_connected(const mqttif_t *p)
@@ -189,6 +247,7 @@ int  mqttif_check_rx_msgs(mqttif_t *p, char *ptopic, char *ppayload)
     return num_msgs_available;
 }
 
-
-
-
+void mqttif_disconnect(mqttif_t *p)
+{
+    p->pmqtt_client->disconnect();
+}

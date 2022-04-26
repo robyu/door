@@ -6,7 +6,7 @@
 #include <ESP8266WiFi.h>
 #include <PubSubClient.h>
 
-#define MQTTIF_MAX_LEN_STR 512
+#define MQTTIF_MAX_LEN_STR 256
 
 typedef struct
 {
@@ -40,7 +40,7 @@ bool mqttif_is_connected(const mqttif_t *p);
 bool mqttif_publish(mqttif_t *p, const char *ptopic, const char *ppayload);
 void mqttif_update(mqttif_t *p);
 int  mqttif_check_rx_msgs(mqttif_t *p, char *ptopic, char *ppayload);
-
+void mqttif_disconnect(mqttif_t *p);
 
 #endif // MQTT_IF_H
 

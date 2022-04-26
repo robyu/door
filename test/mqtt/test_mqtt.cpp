@@ -3,22 +3,21 @@
 #include <ESP8266WiFi.h>
 #include <PubSubClient.h>
 #include "json_config.h"
-
-#define JSONFNAME "/unit_tests.json"
+#include "test_mqtt_common.h"
 
 
 // MQTT Broker Parameters
-char public_mqtt_broker[1024];
-char local_mqtt_broker[1024];
-char mqtt_topic[1024];
-int mqtt_port;
+static char public_mqtt_broker[1024];
+static char local_mqtt_broker[1024];
+static char mqtt_topic[MQTT_MAX_PACKET_SIZE];
+static int mqtt_port;
 
 //
 // pubsubclient api documentation here: https://pubsubclient.knolleary.net/api
-WiFiClient eth_client;
-PubSubClient *pmqtt_client = new PubSubClient(eth_client);
+static WiFiClient eth_client;
+static PubSubClient *pmqtt_client = new PubSubClient(eth_client);
 
-void get_wifi_credential(const char *fname, char *ssid_ptr, size_t len_ssid, char *pwd_ptr, size_t len_pwd)
+void OLDget_wifi_credential(const char *fname, char *ssid_ptr, size_t len_ssid, char *pwd_ptr, size_t len_pwd)
 {
     DynamicJsonDocument json(1024);
     jc_get_config_from_file(fname, &json);
@@ -37,7 +36,7 @@ void get_wifi_credential(const char *fname, char *ssid_ptr, size_t len_ssid, cha
             len_pwd);
 }
 
-void get_broker_params(const char *fname,
+void OLDget_broker_params(const char *fname,
                        char *public_mqtt_broker,
                        char *local_mqtt_broker,
                        size_t max_len_broker,
@@ -72,7 +71,7 @@ void get_broker_params(const char *fname,
     
 }
 
-void setup_wifi(void)
+void OLDsetup_wifi(void)
 {
     int max_attempts = 20;
     int count=0;
