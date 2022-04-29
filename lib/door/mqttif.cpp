@@ -14,46 +14,49 @@ void mqttif_set_default_config(mqttif_config_t *pconfig, const char *pbroker_add
     pconfig->max_num_connect_attempts = 10;
 }
 
-// AGH, rx_callback needs a global
-static mqttif_t *pmqttif_global = NULL;
+/*
+PubSubClient seems to want the object to be global
+Otherwise it crashes w/ stack trace when I call connect()
+*/
+static WiFiClient wifi_client;
+static PubSubClient *pmqtt_client = new PubSubClient(wifi_client);
 
 /*
 copy rx topic + payload into prx_msgs array
 */
+mqttif_t *pmqttif_global;
 void rx_callback(char *ptopic, byte *ppayload, unsigned int length)
 {
-#if 0    
     mqttif_t *p;
-    UTILS_ASSERT(pmqttif_global!=NULL);
+    UTILS_ASSERT(pmqtt_client!=NULL);
     p = pmqttif_global;
-    int rx_msg_index = p->num_rx_msgs - 1;
 
+    int rx_msg_index = p->num_rx_msgs;
+
+    Serial.printf("rx_callback: rcvd topic (%s)\n", ptopic);
     if (p->num_rx_msgs > MQTTIF_NUM_RX)
     {
         Serial.printf("MQTT RX BUFFER overflow\n");
     }
     else
     {
-        int valid_len;
         mqttif_rx_msg_t *pcurr_rx_msg;
 
         UTILS_ASSERT((rx_msg_index >= 0) && (rx_msg_index < MQTTIF_NUM_RX));
-
         pcurr_rx_msg = &(p->prx_msgs[rx_msg_index]);
+
         memset(pcurr_rx_msg->ptopic, 0, MQTTIF_MAX_LEN_STR);
-        Serial.printf("rcvd topic: (%s)\n", ptopic);
         strncpy(pcurr_rx_msg->ptopic, ptopic, MQTTIF_MAX_LEN_STR - 1);
         
         memset(pcurr_rx_msg->ppayload, 0, MQTTIF_MAX_LEN_STR);
-        valid_len = (length < MQTTIF_MAX_LEN_STR) ? length : (MQTTIF_MAX_LEN_STR - 1);
-        strncpy(pcurr_rx_msg->ppayload, (char *)ppayload, valid_len);
+        strncpy(pcurr_rx_msg->ppayload, (char *)ppayload, MQTTIF_MAX_LEN_STR - 1);
 
         p->num_rx_msgs++;
     }
     return;
-#endif    
 }
 
+#if 0
 bool connect_mqtt_broker(mqttif_t *p)
 {
     int count = 0;
@@ -92,8 +95,9 @@ bool connect_mqtt_broker(mqttif_t *p)
     }
     return pmqtt_client->connected();
 }
+#endif
 
-bool connect_mqtt_broker_simple(PubSubClient *pmqtt_client)
+bool connect_mqtt_broker(PubSubClient *pmqtt_client)
 {
     int count = 0;
     String client_name = "door-";
@@ -103,14 +107,6 @@ bool connect_mqtt_broker_simple(PubSubClient *pmqtt_client)
     Serial.printf("client name = %s\n",client_name.c_str());
 
     /*--------------------------------------------------------*/
-#if 0    
-    Serial.printf("pmqtt_client=%p\n",(void *)pmqtt_client);
-
-    Serial.printf("0 connected() = %d\n", (int) (pmqtt_client->connected()) );
-    bool retval = pmqtt_client->connect("esp8266");
-    Serial.printf("retval = %d\n",(int)retval);
-    Serial.printf("1 connected() = %d\n", (int) (pmqtt_client->connected()) );
-#endif
     while (!pmqtt_client->connected() && (count < 5))
     {
         Serial.printf("attempt %d\n",count);  
@@ -128,12 +124,6 @@ bool connect_mqtt_broker_simple(PubSubClient *pmqtt_client)
     return pmqtt_client->connected();
 }
 
-/*
-PubSubClient seems to want the object to be global
-Otherwise it crashes w/ stack trace when I call connect()
-*/
-static WiFiClient eth_client;
-static PubSubClient *pmqtt_client = new PubSubClient(eth_client);
 
 void mqttif_init(mqttif_t *p, const mqttif_config_t *pconfig)
 {
@@ -142,26 +132,14 @@ void mqttif_init(mqttif_t *p, const mqttif_config_t *pconfig)
     UTILS_ASSERT(MQTT_MAX_PACKET_SIZE >= MQTTIF_MAX_LEN_STR);
     p->config = *pconfig;
     p->pmqtt_client = pmqtt_client;
+    pmqttif_global = p;
 
     Serial.printf("mqttif_init: broker addr=%s\n",pconfig->pbroker_addr);
     Serial.printf("mqttif_init: port=%d\n",pconfig->mqtt_port);
     pmqtt_client->setServer(pconfig->pbroker_addr, pconfig->mqtt_port);
     pmqtt_client->setCallback(rx_callback);
 
-/*
-    {
-        //bool is_connected = p->pmqtt_client->connected();
-        Serial.printf("pmqtt_client=%p\n",(void *)p->pmqtt_client);
-        Serial.printf("state=%d\n",p->pmqtt_client->state());
-
-        bool retval = p->pmqtt_client->connect("esp8266");
-        Serial.printf("connect()=%d\n",(int)retval);
-    }
-*/
-    connect_mqtt_broker_simple(p->pmqtt_client);
-
-    UTILS_ASSERT(0);
-
+    connect_mqtt_broker(p->pmqtt_client);
 }
 
 bool mqttif_is_connected(const mqttif_t *p)
@@ -179,7 +157,7 @@ bool mqttif_sub_topic(mqttif_t *p, const char *ptopic)
     bool is_connected;
     bool retval;
     PubSubClient *pmqtt_client = p->pmqtt_client;
-    is_connected = connect_mqtt_broker(p);
+    is_connected = connect_mqtt_broker(p->pmqtt_client);
     if (false==is_connected)
     {
         return false;
@@ -202,7 +180,7 @@ bool mqttif_publish(mqttif_t *p, const char *ptopic, const char *ppayload)
     PubSubClient *pmqtt_client = p->pmqtt_client;
     bool retval;
 
-    is_connected = connect_mqtt_broker(p);
+    is_connected = connect_mqtt_broker(p->pmqtt_client);
     if (false==is_connected)
     {
         return false;
@@ -229,13 +207,14 @@ max length of ptopic and ppayload is MQTTIF_MAX_LEN_STR
 returns:
 number of msgs in rx buffer
 */
-int  mqttif_check_rx_msgs(mqttif_t *p, char *ptopic, char *ppayload)
+int  mqttif_check_rx_msgs(mqttif_t *p, char *ptopic, char *ppayload, int len_str)
 {
     int num_msgs_available = p->num_rx_msgs;
+    UTILS_ASSERT(len_str >= MQTTIF_MAX_LEN_STR);
     if (num_msgs_available <= 0)
     {
-        ptopic = NULL;
-        ppayload = NULL;
+        memset(ptopic, 0, len_str);
+        memset(ppayload, 0, len_str);
         return 0;
     }
     else
@@ -243,8 +222,8 @@ int  mqttif_check_rx_msgs(mqttif_t *p, char *ptopic, char *ppayload)
         int n;
         // dequeue msg 0
         mqttif_rx_msg_t *prx_msg = &(p->prx_msgs[0]);
-        strncpy(ptopic,   prx_msg->ptopic,    MQTTIF_MAX_LEN_STR);
-        strncpy(ppayload, prx_msg->ppayload,  MQTTIF_MAX_LEN_STR);
+        strncpy(ptopic,   prx_msg->ptopic,    len_str);
+        strncpy(ppayload, prx_msg->ppayload,  len_str);
 
         //
         // move the remaining msgs

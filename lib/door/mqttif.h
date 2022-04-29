@@ -26,7 +26,6 @@ typedef struct
 typedef struct
 {
     mqttif_config_t config;
-    WiFiClient eth_client;
     PubSubClient *pmqtt_client;
 
     int num_rx_msgs;
@@ -39,7 +38,7 @@ bool mqttif_sub_topic(mqttif_t *p, const char *ptopic);
 bool mqttif_is_connected(const mqttif_t *p);
 bool mqttif_publish(mqttif_t *p, const char *ptopic, const char *ppayload);
 void mqttif_update(mqttif_t *p);
-int  mqttif_check_rx_msgs(mqttif_t *p, char *ptopic, char *ppayload);
+int  mqttif_check_rx_msgs(mqttif_t *p, char *ptopic, char *ppayload, int len_str);
 void mqttif_disconnect(mqttif_t *p);
 
 #endif // MQTT_IF_H

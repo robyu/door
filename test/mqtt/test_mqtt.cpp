@@ -192,11 +192,12 @@ void test_pub_sub(void)
 
     //
     // loop until I receive a topic message
-    // publish to same topic on first iteration
+    // msgs are received by rx_callback
     int count = 0;
     int max_attempts = 100;
     while ((rx_length <= 0) && (count < max_attempts))
     {
+        // publish to same topic on first iteration
         if (count==0)
         {
             retval = pmqtt_client->publish(topic, "hello hello");
@@ -220,9 +221,9 @@ void test_smoke(void)
 
 
 void loop() {
-    RUN_TEST(test_smoke);
-    RUN_TEST(test_connect_public_broker);
-    RUN_TEST(test_connect_local_broker);
+    //RUN_TEST(test_smoke);
+    //RUN_TEST(test_connect_public_broker);
+    // RUN_TEST(test_connect_local_broker);
     RUN_TEST(test_pub_sub);
     pmqtt_client->disconnect();
     UNITY_END();
