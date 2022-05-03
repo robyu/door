@@ -13,6 +13,8 @@
 #define LED_SLOW_BLINK 10
 #define LED_FAST_BLINK  2   
 
+WiFiManager wifi_manager;
+
 static enum_descr_t wifimon_state_descr[] =
 {
     ENUM_DESCR_DECLARE(WM_DONT_USE),
@@ -135,7 +137,7 @@ or
 https://docs.google.com/drawings/d/1ZojjvD8IzcoGZNFNz5XOvnSn9KmD7tuCvef_ixaX7fY/edit?usp=sharing
 */
 
-static wifi_state_t do_update(wifimon_t *pstate)
+static wifi_state_t do_update_logic(wifimon_t *pstate)
 {
     wifi_state_t next_state;
 
@@ -148,18 +150,21 @@ static wifi_state_t do_update(wifimon_t *pstate)
         next_state = WM_CHECK_RESET;
         break;
 
-    case WM_CHECK_RESET:
+    case WM_CHECK_RESET: // check if reset button pressed
         //Serial.println("WM_CHECK_RESET_STATE");
         //Serial.println("  reset button = " + String(switch_update_state(&pstate->reset_button)));
 
-        if ((switch_update_state(&pstate->reset_button)==0) &&
-            (utils_get_elapsed_msec_and_reset(&pstate->start_time) > 2 * pstate->threshold_check_reset_ms)) 
+        if (switch_update_state(&pstate->reset_button)==0)
         {
-            // button is UP  AND we've waited a sufficiently long period,
-            // so continue to next state
-            //
-            // we need to wait to give button time to settle; otherwise may not be detected
-            next_state = WM_NOT_CONNECTED;
+            if (utils_get_elapsed_msec_and_reset(&pstate->start_time) > 2 * pstate->threshold_check_reset_ms)
+            {
+
+                // button is UP  AND we've waited a sufficiently long period,
+                // so continue to next state
+                //
+                // we need to wait to give button time to settle; otherwise may not be detected
+                next_state = WM_NOT_CONNECTED;
+            }
         }
         else
         {
@@ -188,6 +193,17 @@ static wifi_state_t do_update(wifimon_t *pstate)
             // transition: light up indicator LED
             next_state = WM_CONNECTED;
         }
+        else if (utils_get_elapsed_msec_and_reset(&pstate->start_time) > pstate->threshold_not_connected_ms)
+        {
+            // we've been not connected for too long
+            next_state = WM_REBOOT;
+        }
+        else
+        {
+            Serial.printf("wifimon:do_update NOT_CONNECTED state for (%ld) msec\n", utils_get_elapsed_msec_and_reset(&pstate->start_time));
+        }
+        
+            
         break;
 
     case WM_CONNECTED:
@@ -214,6 +230,16 @@ static wifi_state_t do_update(wifimon_t *pstate)
         next_state = pstate->debug_next_state;
         pstate->debug_next_state = WM_DONT_USE;
     }
+
+    if (pstate->curr_state != next_state)
+    {
+        Serial.printf("wifimon: do_update: (%s) -> (%s)]\n", state_to_string(pstate->curr_state).c_str(), state_to_string(next_state).c_str());
+    }
+    else
+    {
+        Serial.printf("wifimon: do_update: curr state = (%s)\n", state_to_string(pstate->curr_state).c_str());
+    }
+    
     //Serial.println("next_state: " + state_to_string(next_state));
     return next_state;
 }
@@ -221,7 +247,6 @@ static wifi_state_t do_update(wifimon_t *pstate)
 // see https://github.com/tzapu/WiFiManager/blob/master/examples/OnDemandConfigPortal/OnDemandConfigPortal.ino
 static void start_config_portal(wifimon_t *pstate)
 {
-    WiFiManager wifi_manager;
     WiFiManagerParameter custom_mqtt_server("server", "mqtt server", pstate->pmqtt_server, WIFIMON_MAX_LEN_MQTT_SERVER);
     WiFiManagerParameter custom_mqtt_port("port", "mqtt port", pstate->pmqtt_port, WIFIMON_MAX_LEN_MQTT_PORT);
 
@@ -325,6 +350,7 @@ static void do_steadystate(wifimon_t *pstate)
         break;
 
     case WM_NOT_CONNECTED:
+        wifi_manager.autoConnect();
         break;
       
     case WM_CONNECTED:
@@ -342,7 +368,7 @@ static void do_steadystate(wifimon_t *pstate)
 int wifimon_update(wifimon_t *pstate)
 {
     wifi_state_t next_state;
-    next_state = do_update(pstate);
+    next_state = do_update_logic(pstate);
 
     do_transitions(pstate, next_state);
     do_steadystate(pstate);
