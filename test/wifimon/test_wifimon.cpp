@@ -70,7 +70,7 @@ void test_open_ap_portal_then_quit(void)
       not connected: off
       connected: slow blink
     */
-void test_led_check_reset(void)
+void test_led_check_reconfig(void)
 {
     WiFiManager wm;
     wifimon_t wifimon;
@@ -83,15 +83,15 @@ void test_led_check_reset(void)
     wifimon.enable_restart = false;
     wifimon.pretend_network_connected = false;
 
-    // enter check_reset state 
+    // enter check_reconfig state 
     Serial.println("==========================");
-    Serial.println("forcing wifimon into CHECK_RESET for " + String(duration_ms) + " ms");
+    Serial.println("forcing wifimon into CHECK_RECONFIG for " + String(duration_ms) + " ms");
     Serial.println("VERIFY LED state==fast blink");
     
     time0_ms = millis();
     while(millis() - time0_ms < duration_ms)
     {
-        wifimon_force_transition(&wifimon, WM_CHECK_RESET);
+        wifimon_force_transition(&wifimon, WM_CHECK_RECONFIG_BTN);
         wifimon_update(&wifimon);
         delay(100);
     }
@@ -110,7 +110,7 @@ void test_led_connected(void)
     wifimon.enable_restart = false;
     wifimon.pretend_network_connected = false;
 
-    // enter check_reset state 
+    // enter check_reconfig state 
     Serial.println("");
     Serial.println("==========================");
     Serial.println("forcing wifimon into CONNECTED for " + String(duration_ms) + " ms");
@@ -157,7 +157,7 @@ void test_wifi_param_file_read_write(void)
 void loop() {
     RUN_TEST(test_open_ap_portal_then_quit);
     RUN_TEST(test_force_reconfig);
-    RUN_TEST(test_led_check_reset);
+    RUN_TEST(test_led_check_reconfig);
     RUN_TEST(test_led_connected);
     RUN_TEST(test_wifi_param_file_read_write);
 

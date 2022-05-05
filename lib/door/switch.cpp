@@ -27,7 +27,6 @@ int switch_update_state(switch_t *pstate)
     switch_state = Debounce(&pstate->debouncer);
     if (switch_state!=pstate->curr_state)
     {
-        Serial.println("switch state changed");
         pstate->curr_state = switch_state;
         pstate->state_change_time = millis();
     }

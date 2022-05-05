@@ -10,27 +10,40 @@
 #include "enum_descr.h"
 #include "LittleFS.h"
 
+/*
+BLINK PATTERNS
+====================
+no blink i= WM_NOT_CONNECTED
+slow blink = WM_CONNECTED
+fast blink = reconfig button is being pressed
+solid = reconfig mode (AP mode)
+
+blink intervals assume delay(100) in main loop
+*/
 #define LED_SLOW_BLINK 10
-#define LED_FAST_BLINK  2   
+#define LED_FAST_BLINK  1
 
 WiFiManager wifi_manager;
 
-static enum_descr_t wifimon_state_descr[] =
+/*
+make a little mapping of enums-to-strings,
+so you can print the string version of an enum
+*/
+static const char* state_to_string(wifimon_state_t state)
 {
-    ENUM_DESCR_DECLARE(WM_DONT_USE),
-    ENUM_DESCR_DECLARE(WM_INIT),
-    ENUM_DESCR_DECLARE(WM_CHECK_RESET),
-    ENUM_DESCR_DECLARE(WM_RECONFIG),
-    ENUM_DESCR_DECLARE(WM_NOT_CONNECTED),
-    ENUM_DESCR_DECLARE(WM_CONNECTED),
-    ENUM_DESCR_DECLARE(WM_REBOOT),
-    ENUM_DESCR_DECLARE(WM_LAST_DONT_USE),
-    ENUM_DESCR_END
-};
+    enum_descr_t wifimon_state_descr[] = {
+        ENUM_DESCR_DECLARE(WM_DONT_USE),
+        ENUM_DESCR_DECLARE(WM_INIT),
+        ENUM_DESCR_DECLARE(WM_CHECK_RECONFIG_BTN),
+        ENUM_DESCR_DECLARE(WM_RECONFIG),
+        ENUM_DESCR_DECLARE(WM_NOT_CONNECTED),
+        ENUM_DESCR_DECLARE(WM_CONNECTED),
+        ENUM_DESCR_DECLARE(WM_REBOOT),
+        ENUM_DESCR_DECLARE(WM_LAST_DONT_USE),
+        ENUM_DESCR_END
+    };
 
-static String state_to_string(wifi_state_t state)
-{
-    return String(wifimon_state_descr[(int)state].pvalue_str);
+    return wifimon_state_descr[(int)state].pvalue_str;
 }
 
 static int wifi_is_connected(const wifimon_t *pstate)
@@ -97,20 +110,21 @@ void wifimon_write_mqtt_params_to_file(char *pmqtt_server,
     return;
 }
 
-void wifimon_init(wifimon_t *pstate, int led_pin, int reset_button_pin)
+void wifimon_init(wifimon_t *pstate, int led_pin, int reconfig_button_pin)
 {
-    //memset(pstate, 0, sizeof(*pstate));
+    UTILS_ZERO_STRUCT(pstate);
+
     pstate->led_pin = led_pin;
 
     if (led_pin >= 0)
     {
         pinMode(led_pin, OUTPUT);
     }
-    switch_init(&pstate->reset_button, reset_button_pin);
+    switch_init(&pstate->reset_button, reconfig_button_pin);
 
     pstate->curr_state = WM_INIT;
     pstate->threshold_check_reset_ms = 1000;
-    pstate->threshold_reboot_button_ms = 5000;
+    pstate->threshold_reconfig_button_ms = 5000;
     pstate->threshold_reconfig_sec = 180; 
     pstate->threshold_not_connected_ms = 20000;
 
@@ -137,9 +151,9 @@ or
 https://docs.google.com/drawings/d/1ZojjvD8IzcoGZNFNz5XOvnSn9KmD7tuCvef_ixaX7fY/edit?usp=sharing
 */
 
-static wifi_state_t do_update_logic(wifimon_t *pstate)
+static wifimon_state_t do_update_logic(wifimon_t *pstate)
 {
-    wifi_state_t next_state;
+    wifimon_state_t next_state;
 
     //Serial.println("do_update: initial state: " + state_to_string(pstate->curr_state));
 
@@ -147,11 +161,11 @@ static wifi_state_t do_update_logic(wifimon_t *pstate)
     switch(pstate->curr_state)
     {
     case WM_INIT:
-        next_state = WM_CHECK_RESET;
+        next_state = WM_CHECK_RECONFIG_BTN;
         break;
 
-    case WM_CHECK_RESET: // check if reset button pressed
-        //Serial.println("WM_CHECK_RESET_STATE");
+    case WM_CHECK_RECONFIG_BTN: // check if reset button pressed
+        //Serial.println("WM_CHECK_RECONFIG_BTN_STATE");
         //Serial.println("  reset button = " + String(switch_update_state(&pstate->reset_button)));
 
         if (switch_update_state(&pstate->reset_button)==0)
@@ -218,7 +232,7 @@ static wifi_state_t do_update_logic(wifimon_t *pstate)
         break;
         
     default:
-        Serial.println("wifimon::do_update illegal state " + state_to_string(pstate->curr_state));
+        Serial.println("wifimon::do_update illegal state " + String(state_to_string(pstate->curr_state)));
         UTILS_ASSERT(0);
     }
 
@@ -226,20 +240,10 @@ static wifi_state_t do_update_logic(wifimon_t *pstate)
     // force transition?
     if (pstate->debug_next_state != WM_DONT_USE)
     {
-        //Serial.println("wifimon: forcing next state = " + state_to_string(pstate->debug_next_state));
         next_state = pstate->debug_next_state;
         pstate->debug_next_state = WM_DONT_USE;
     }
 
-    if (pstate->curr_state != next_state)
-    {
-        Serial.printf("wifimon: do_update: (%s) -> (%s)]\n", state_to_string(pstate->curr_state).c_str(), state_to_string(next_state).c_str());
-    }
-    else
-    {
-        Serial.printf("wifimon: do_update: curr state = (%s)\n", state_to_string(pstate->curr_state).c_str());
-    }
-    
     //Serial.println("next_state: " + state_to_string(next_state));
     return next_state;
 }
@@ -282,7 +286,7 @@ static void start_config_portal(wifimon_t *pstate)
     }
 }
 
-static void do_transitions(wifimon_t *pstate, wifi_state_t next_state)
+static void do_transitions(wifimon_t *pstate, wifimon_state_t next_state)
 {
     if (next_state==pstate->curr_state)
     {
@@ -290,25 +294,24 @@ static void do_transitions(wifimon_t *pstate, wifi_state_t next_state)
     }
     else
     {
-        //Serial.println("do_transitions: " + state_to_string(pstate->curr_state) + "->" + state_to_string(next_state));
+        Serial.printf("do_transitions: %s -> %s\n", state_to_string(pstate->curr_state), state_to_string(next_state));
         switch(next_state)
         {
         case WM_INIT:
             UTILS_ASSERT(0);
             break;
             
-        case WM_CHECK_RESET:
+        case WM_CHECK_RECONFIG_BTN:
             pstate->start_time = millis();
             break;
             
         case WM_RECONFIG:
-            utils_set_led(pstate->led_pin, 1);
+            utils_set_led(pstate->led_pin, 1); // solid LED
             start_config_portal(pstate);
             break;
 
         case WM_NOT_CONNECTED:
             pstate->start_time = millis();
-            utils_set_led(pstate->led_pin, 0);
             break;
 
         case WM_CONNECTED:
@@ -317,7 +320,7 @@ static void do_transitions(wifimon_t *pstate, wifi_state_t next_state)
             break;
 
         case WM_REBOOT:
-            utils_set_led(pstate->led_pin, 0);
+            utils_set_led(pstate->led_pin, 0); // blank LED
             if (pstate->enable_restart)
             {
                 utils_restart();
@@ -326,7 +329,7 @@ static void do_transitions(wifimon_t *pstate, wifi_state_t next_state)
 
         default:
             // shouldn't ever reach this point
-            Serial.println("wifimon::do_transitions illegal state " + state_to_string(pstate->curr_state));
+            Serial.printf("wifimon::do_transitions illegal state %s\n", state_to_string(pstate->curr_state));
             UTILS_ASSERT(0);
             
         }
@@ -341,21 +344,31 @@ static void do_steadystate(wifimon_t *pstate)
     case WM_INIT:
         break;
 
-    case WM_CHECK_RESET:
+    case WM_CHECK_RECONFIG_BTN:
         pstate->led_counter++;
-        utils_set_led(pstate->led_pin, pstate->led_counter % LED_FAST_BLINK);
+        if ((pstate->led_counter % LED_FAST_BLINK)==0)
+        {
+            pstate->led_state ^= 1;
+        }
+        utils_set_led(pstate->led_pin, pstate->led_state); // fast blink
         break;
 
     case WM_RECONFIG:
         break;
 
     case WM_NOT_CONNECTED:
+        utils_set_led(pstate->led_pin, 0); // dead LED
         wifi_manager.autoConnect();
         break;
       
     case WM_CONNECTED:
         pstate->led_counter++;
-        utils_set_led(pstate->led_pin, pstate->led_counter % LED_SLOW_BLINK);
+        if ((pstate->led_counter % LED_SLOW_BLINK)==0)
+        {
+            pstate->led_state ^= 1;
+            //Serial.printf("led_counter=%d led_state=%d\n",pstate->led_counter,pstate->led_state);
+        }
+        utils_set_led(pstate->led_pin, pstate->led_state); // slow blink
         break;
 
     case WM_REBOOT:
@@ -367,7 +380,7 @@ static void do_steadystate(wifimon_t *pstate)
 
 int wifimon_update(wifimon_t *pstate)
 {
-    wifi_state_t next_state;
+    wifimon_state_t next_state;
     next_state = do_update_logic(pstate);
 
     do_transitions(pstate, next_state);
@@ -376,7 +389,7 @@ int wifimon_update(wifimon_t *pstate)
     return (pstate->curr_state==WM_CONNECTED); // return connection state
 }
 
-void wifimon_force_transition(wifimon_t *pstate, wifi_state_t next_state)
+void wifimon_force_transition(wifimon_t *pstate, wifimon_state_t next_state)
 {
     pstate->debug_next_state = next_state;
 }
