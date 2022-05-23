@@ -37,8 +37,10 @@ void mqttif_init(mqttif_t *p, const mqttif_config_t *pconfig);
 bool mqttif_sub_topic(mqttif_t *p, const char *ptopic);
 bool mqttif_is_connected(const mqttif_t *p);
 bool mqttif_publish(mqttif_t *p, const char *ptopic, const char *ppayload);
-void mqttif_update(mqttif_t *p);
-int  mqttif_check_rx_msgs(mqttif_t *p, char *ptopic, char *ppayload, int len_str);
+bool mqttif_update(mqttif_t *p);
+
+int mqttif_get_num_rx_msgs(mqttif_t *p);
+int mqttif_check_rx_msgs(mqttif_t *p, char *ptopic, char *ppayload, int len_str);
 void mqttif_disconnect(mqttif_t *p);
 
 #endif // MQTT_IF_H

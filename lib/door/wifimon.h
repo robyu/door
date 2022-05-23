@@ -57,7 +57,7 @@ void wifimon_write_mqtt_params_to_file(char *pmpqtt_server,
 
 void wifimon_read_mqtt_params_from_file(char *pmpqtt_server,
                                         int len_server,
-                                        char *mpqtt_port,
+                                        char *pmqtt_port,
                                         int len_port);
 
 #endif // switch_h

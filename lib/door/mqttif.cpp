@@ -25,7 +25,7 @@ static PubSubClient *pmqtt_client = new PubSubClient(wifi_client);
 copy rx topic + payload into prx_msgs array
 */
 mqttif_t *pmqttif_global;
-void rx_callback(char *ptopic, byte *ppayload, unsigned int length)
+static void rx_callback(char *ptopic, byte *ppayload, unsigned int length)
 {
     mqttif_t *p;
     UTILS_ASSERT(pmqtt_client!=NULL);
@@ -56,7 +56,6 @@ void rx_callback(char *ptopic, byte *ppayload, unsigned int length)
     return;
 }
 
-#if 0
 bool connect_mqtt_broker(mqttif_t *p)
 {
     int count = 0;
@@ -95,9 +94,8 @@ bool connect_mqtt_broker(mqttif_t *p)
     }
     return pmqtt_client->connected();
 }
-#endif
 
-bool connect_mqtt_broker(PubSubClient *pmqtt_client)
+static bool connect_mqtt_broker(PubSubClient *pmqtt_client)
 {
     int count = 0;
     String client_name = "door-";
@@ -118,7 +116,7 @@ bool connect_mqtt_broker(PubSubClient *pmqtt_client)
         } else {
             Serial.printf("failed with state (%s)\n", String(pmqtt_client->state()).c_str());
             Serial.println(pmqtt_client->state());
-            delay(2000);
+            delay(500);
         }
     }
     return pmqtt_client->connected();
@@ -195,9 +193,20 @@ bool mqttif_publish(mqttif_t *p, const char *ptopic, const char *ppayload)
     return retval;
 }
 
-void mqttif_update(mqttif_t *p)
+/*
+  update mqttif
+
+  returns
+  bool is_connected 
+*/
+bool mqttif_update(mqttif_t *p)
 {
-    p->pmqtt_client->loop();
+    bool is_connected = connect_mqtt_broker(p->pmqtt_client);
+    if (true==is_connected)
+    {
+        p->pmqtt_client->loop();
+    }
+    return is_connected;
 }
 
 
