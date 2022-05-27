@@ -13,9 +13,9 @@
 */
 void utils_restart(void)
 {
+    Serial.printf("REBOOTING NOW ==========================================");
     delay(500);
     ESP.restart();
-    delay(500);
 }
 /*
 on_off is 1 or 0

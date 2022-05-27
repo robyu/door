@@ -18,8 +18,7 @@ typedef enum
     WM_LAST_DONT_USE
 } wifimon_state_t;
 
-#define WIFIMON_MAX_LEN_MQTT_SERVER 255
-#define WIFIMON_MAX_LEN_MQTT_PORT 6
+#define WIFIMON_MAX_LEN_MQTT_SERVER 128
 
 typedef struct
 {
@@ -34,10 +33,10 @@ typedef struct
     long threshold_reconfig_sec;
     long threshold_not_connected_ms;
     long start_time;
+    int reconfig_loop_cnt;
 
     char pmqtt_server[WIFIMON_MAX_LEN_MQTT_SERVER];
-    char pmqtt_port[WIFIMON_MAX_LEN_MQTT_PORT];
-
+    short mqtt_port;
     
     // for debugging
     wifimon_state_t debug_next_state;
@@ -49,16 +48,11 @@ typedef struct
 void wifimon_init(wifimon_t *pstate, int led_pin, int reconfig_button_pin);
 wifimon_state_t wifimon_update(wifimon_t *pstate);
 void wifimon_force_transition(wifimon_t *pstate, wifimon_state_t next_state);
-
-void wifimon_write_mqtt_params_to_file(char *pmpqtt_server,
-                                       int len_server,
-                                       char *mpqtt_port,
-                                       int len_port);
-
-void wifimon_read_mqtt_params_from_file(char *pmpqtt_server,
-                                        int len_server,
-                                        char *pmqtt_port,
-                                        int len_port);
+void wifimon_print_info(void);
+void wifimon_write_mqtt_params_to_file(const char *pmqtt_server,
+                                       short mqtt_port);
+void wifimon_read_mqtt_params_from_file(char *pmqtt_server,
+                                        short *pmqtt_port);
 
 #endif // switch_h
 

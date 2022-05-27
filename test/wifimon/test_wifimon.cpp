@@ -7,6 +7,7 @@
 #include <ESP8266WebServer.h> 
 #include <ESP8266WiFi.h> 
 #include <WiFiManager.h>
+#include "utils.h"
 
 wifimon_t wifimon_state;
 
@@ -15,6 +16,23 @@ void setup() {
     delay(1000); // pause for a bit
 
     UNITY_BEGIN();    // IMPORTANT LINE!
+}
+
+void test_init_and_quit(void)
+{
+    WiFiManager wm;
+    Serial.printf("TEST_INIT_AND_QUIT==================================\n");
+    Serial.printf("wifimon init\n");
+    wifimon_init(&wifimon_state,
+                 LED_WIFI,
+                 BTN_RESET);
+    wifimon_state.threshold_reconfig_sec = 30;
+    
+    Serial.printf("wifimon update\n");
+    wifimon_update(&wifimon_state);
+
+    Serial.printf("exit\n");
+    TEST_ASSERT_TRUE(wm.getWiFiIsSaved()==1);
 }
 
 void test_force_reconfig(void)
@@ -39,6 +57,7 @@ void test_force_reconfig(void)
     TEST_ASSERT_TRUE(wm.getWiFiIsSaved()==1);
 }
 
+/*
 void wifiInfo(WiFiManager *wm){
     Serial.println("====================================");
     WiFi.printDiag(Serial);
@@ -49,6 +68,7 @@ void wifiInfo(WiFiManager *wm){
     Serial.println("Connected: " + String(WiFi.status()==WL_CONNECTED));
     Serial.println("====================================");
 }
+*/
 
 void test_open_ap_portal_then_quit(void)
 {
@@ -56,10 +76,10 @@ void test_open_ap_portal_then_quit(void)
     WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP IS THIS NECESSARY?
     wm.debugPlatformInfo();
     wm.setConfigPortalTimeout(5); // return from config portal after N seconds, no matter what
-    wifiInfo(&wm);
+    wifimon_print_info();
     wm.startConfigPortal("door-config");
 
-    wifiInfo(&wm);
+    wifimon_print_info();
 
     TEST_ASSERT_TRUE(wm.getWiFiIsSaved()==1);
 }
@@ -129,10 +149,11 @@ void test_led_connected(void)
 void test_wifi_param_file_read_write(void)
 {
     wifimon_t wifimon;
-    char pmqtt_server[] = "mqtt.somewhere.com";
-    char pmqtt_port[] = "8888";
+    char pmqtt_server[128];
+    short mqtt_port;
+
     char pmqtt_server2[WIFIMON_MAX_LEN_MQTT_SERVER];
-    char pmqtt_port2[WIFIMON_MAX_LEN_MQTT_PORT];
+    short mqtt_port2;
 
     wifimon_init(&wifimon, 
                  LED_WIFI,
@@ -141,25 +162,69 @@ void test_wifi_param_file_read_write(void)
     wifimon.pretend_network_connected = false;
 
 
+    /*
+      generate random params
+    */
+    {
+        int n0,n1,n2,n3;
+        
+        UTILS_ZERO_STRUCT(pmqtt_server);
+
+        n0 = random(255);
+        n1 = random(255);
+        n2 = random(255);
+        n3 = random(255);
+        sprintf(pmqtt_server, "%d.%d.%d.%d",n0,n1,n2,n3);
+
+        mqtt_port = (short)random(1024);
+    }
+    
+    Serial.printf("mqtt_server = (%s)\n",pmqtt_server);
+    Serial.printf("mqtt_port = (%d)\n",mqtt_port);
     wifimon_write_mqtt_params_to_file(pmqtt_server,
-                                      WIFIMON_MAX_LEN_MQTT_SERVER,
-                                      pmqtt_port,
-                                      WIFIMON_MAX_LEN_MQTT_PORT);
+                                      mqtt_port);
 
     wifimon_read_mqtt_params_from_file(pmqtt_server2,
-                                       WIFIMON_MAX_LEN_MQTT_SERVER,
-                                       pmqtt_port2,
-                                       WIFIMON_MAX_LEN_MQTT_PORT);
+                                       &mqtt_port2);
+    Serial.printf("mqtt_server2 = (%s)\n",pmqtt_server2);
+    Serial.printf("mqtt_port2 = (%d)\n",mqtt_port2);
+
     TEST_ASSERT_TRUE(String(pmqtt_server)==String(pmqtt_server2));
+    TEST_ASSERT_TRUE(mqtt_port==mqtt_port2);
     
 }
 
+void test_loop(void)
+{
+    WiFiManager wm;
+    int n;
+    Serial.printf("TEST_LOOP ==================================\n");
+    Serial.printf("wifimon init\n");
+    wifimon_init(&wifimon_state,
+                 LED_WIFI,
+                 BTN_RESET);
+    wifimon_state.threshold_reconfig_sec = 30;
+    
+    for (n=0;n<6;n++)
+    {
+        Serial.printf("\n");
+        Serial.printf("\niteration %d\n",n);
+        wifimon_update(&wifimon_state);
+        delay(1000);
+    }
+
+    Serial.printf("exit\n");
+    TEST_ASSERT_TRUE(true);
+}
+
 void loop() {
-    RUN_TEST(test_open_ap_portal_then_quit);
-    RUN_TEST(test_force_reconfig);
-    RUN_TEST(test_led_check_reconfig);
-    RUN_TEST(test_led_connected);
+    // RUN_TEST(test_init_and_quit);
+    // RUN_TEST(test_open_ap_portal_then_quit);
+    // RUN_TEST(test_force_reconfig);
+    // RUN_TEST(test_led_check_reconfig);
+    // RUN_TEST(test_led_connected);
     RUN_TEST(test_wifi_param_file_read_write);
 
+    //RUN_TEST(test_loop);
     UNITY_END();
 }

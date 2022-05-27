@@ -63,33 +63,41 @@ static int wifi_is_connected(const wifimon_t *pstate)
 #define MQTT_FNAME "/mqtt_params.txt"
 
 void wifimon_read_mqtt_params_from_file(char *pmqtt_server,
-                                        int len_server,
-                                        char *pmqtt_port,
-                                        int len_port)
+                                        short *pmqtt_port)
+
 {
     File file;
     file = LittleFS.open(MQTT_FNAME, "r");
     if (!file)
     {
-        memset(pmqtt_server, 0, len_server * sizeof(char));
-        memset(pmqtt_port, 0, len_port * sizeof(char));
+        memset(pmqtt_server, 0, WIFIMON_MAX_LEN_MQTT_SERVER);
+        *pmqtt_port = 0;
     }
     else
     {
-        int numbytes;
-        numbytes = file.readBytesUntil('\n', pmqtt_server, len_server);
-        UTILS_ASSERT(numbytes < len_server);
-
-        numbytes = file.readBytesUntil('\n', pmqtt_port, len_port);
-        UTILS_ASSERT(numbytes < len_port);
+        file.readBytes(pmqtt_server, WIFIMON_MAX_LEN_MQTT_SERVER);
+        file.readBytes((char *)pmqtt_port, sizeof(*pmqtt_port));
     }
     return;
 }
 
-void wifimon_write_mqtt_params_to_file(char *pmqtt_server,
-                                       int len_server,
-                                       char *pmqtt_port,
-                                       int len_port)
+void wifimon_print_info(WiFiManager *wm, wifimon_t *pstate)
+{
+    Serial.printf("  WIFIMON INFO PARAMS=====================\n");
+    WiFi.printDiag(Serial);
+    Serial.printf("  -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=\n");
+    Serial.printf("  SAVED: %d\n",  wm->getWiFiIsSaved() );
+    Serial.printf("  SSID: %s\n", wm->getWiFiSSID().c_str());
+    Serial.printf("  PASS: %s\n", wm->getWiFiPass().c_str());;
+    Serial.printf("  Connected: %d\n", WiFi.status()==WL_CONNECTED);
+    Serial.printf("\n");
+    Serial.printf("  mqtt server: %s\n", pstate->pmqtt_server);
+    Serial.printf("  mqtt port: %d\n", pstate->mqtt_port);
+    Serial.printf("====================================\n");
+}
+
+void wifimon_write_mqtt_params_to_file(const char *pmqtt_server,
+                                       short mqtt_port)
 {
     File file;
     file = LittleFS.open(MQTT_FNAME, "w");
@@ -99,14 +107,13 @@ void wifimon_write_mqtt_params_to_file(char *pmqtt_server,
         Serial.println("Failed to open file " + String(MQTT_FNAME));
         return;
     }
-    else
-    {
-        UTILS_ASSERT((int)strlen(pmqtt_server) < len_server);
-        file.write(pmqtt_server, strlen(pmqtt_server)+1);
 
-        UTILS_ASSERT((int)strlen(pmqtt_port) < len_port);
-        file.write(pmqtt_port, strlen(pmqtt_port)+1);
-    }
+    UTILS_ASSERT((int)strlen(pmqtt_server) < WIFIMON_MAX_LEN_MQTT_SERVER);
+    file.write(pmqtt_server, WIFIMON_MAX_LEN_MQTT_SERVER);
+    
+    file.write((uint8_t *)&mqtt_port, sizeof(mqtt_port));
+    Serial.printf("wrote mqtt params to %s\n", MQTT_FNAME);
+    
     return;
 }
 
@@ -121,6 +128,14 @@ void wifimon_init(wifimon_t *pstate, int led_pin, int reconfig_button_pin)
         pinMode(led_pin, OUTPUT);
     }
     switch_init(&pstate->reset_button, reconfig_button_pin);
+
+    // Station mode == connect to previously saved access point
+    // Access Point Mode == for configuration, act as access point
+    //
+    // force station mode because if device was switched off while in access point mode,
+    // it will startup in access point mode again
+    // see https://github.com/kentaylor/WiFiManager/blob/master/examples/ConfigOnSwitch/ConfigOnSwitch.ino#L46
+    WiFi.mode(WIFI_STA);  
 
     pstate->curr_state = WM_INIT;
     pstate->threshold_check_reset_ms = 1000;
@@ -138,9 +153,7 @@ void wifimon_init(wifimon_t *pstate, int led_pin, int reconfig_button_pin)
 
         
     wifimon_read_mqtt_params_from_file(pstate->pmqtt_server,
-                                       WIFIMON_MAX_LEN_MQTT_SERVER,
-                                       pstate->pmqtt_port,
-                                       WIFIMON_MAX_LEN_MQTT_PORT);
+                                       &pstate->mqtt_port);
     pstate->enable_restart = true;
 }
 
@@ -162,15 +175,18 @@ static wifimon_state_t do_update_logic(wifimon_t *pstate)
     {
     case WM_INIT:
         next_state = WM_CHECK_RECONFIG_BTN;
+        pstate->start_time = millis();
+        pstate->reconfig_loop_cnt = 0;
         break;
 
     case WM_CHECK_RECONFIG_BTN: // check if reset button pressed
         //Serial.println("WM_CHECK_RECONFIG_BTN_STATE");
-        //Serial.println("  reset button = " + String(switch_update_state(&pstate->reset_button)));
+        Serial.println("  (WM_CHECK_RECONFIG_BTN): reset button = " + String(switch_update_state(&pstate->reset_button)));
 
         if (reset_button==0)
         {
-            if (utils_get_elapsed_msec_and_reset(&pstate->start_time) > 2 * pstate->threshold_check_reset_ms)
+            if ((utils_get_elapsed_msec_and_reset(&pstate->start_time) > 2 * pstate->threshold_check_reset_ms) &&
+                (pstate->reconfig_loop_cnt >= 5))
             {
 
                 // button is UP  AND we've waited a sufficiently long period,
@@ -178,12 +194,17 @@ static wifimon_state_t do_update_logic(wifimon_t *pstate)
                 //
                 // we need to wait to give button time to settle; otherwise may not be detected
                 next_state = WM_NOT_CONNECTED;
+                pstate->start_time = millis(); // elapsed time disconnected
             }
         }
         else
         {
             // button is DOWN
             UTILS_ASSERT(1==reset_button);
+
+            // restart loop count
+            pstate->reconfig_loop_cnt = 0;
+            
             if (switch_get_state_duration_ms(&pstate->reset_button) >= pstate->threshold_check_reset_ms)
             {
                 // long press -> go to reconfig
@@ -244,15 +265,22 @@ static wifimon_state_t do_update_logic(wifimon_t *pstate)
         pstate->debug_next_state = WM_DONT_USE;
     }
 
-    //Serial.println("next_state: " + state_to_string(next_state));
+    if (pstate->curr_state != next_state)
+    {
+        Serial.printf("TRANSITION (%s) -> (%s)\n", state_to_string(pstate->curr_state),  state_to_string(next_state));
+    }
+
     return next_state;
 }
 
 // see https://github.com/tzapu/WiFiManager/blob/master/examples/OnDemandConfigPortal/OnDemandConfigPortal.ino
 static void start_config_portal(wifimon_t *pstate)
 {
+    char pmqtt_port_char[WIFIMON_MAX_LEN_MQTT_SERVER];
+    strncpy(pmqtt_port_char, String(pstate->mqtt_port).c_str(), WIFIMON_MAX_LEN_MQTT_SERVER);
+
     WiFiManagerParameter custom_mqtt_server("server", "mqtt server", pstate->pmqtt_server, WIFIMON_MAX_LEN_MQTT_SERVER);
-    WiFiManagerParameter custom_mqtt_port("port", "mqtt port", pstate->pmqtt_port, WIFIMON_MAX_LEN_MQTT_PORT);
+    WiFiManagerParameter custom_mqtt_port("port", "mqtt port", pmqtt_port_char, WIFIMON_MAX_LEN_MQTT_SERVER);
 
     wifi_manager.addParameter(&custom_mqtt_server);
     wifi_manager.addParameter(&custom_mqtt_port);
@@ -260,7 +288,8 @@ static void start_config_portal(wifimon_t *pstate)
     //sets timeout until configuration portal gets turned off
     //useful to make it all retry or go to sleep
     //in seconds
-    wifi_manager.setConfigPortalTimeout(pstate->threshold_reconfig_sec);
+    //wifi_manager.setConfigPortalTimeout(pstate->threshold_reconfig_sec);
+    wifi_manager.setConfigPortalTimeout(45);
 
     Serial.println("start_config_portal");
     bool is_connected = wifi_manager.startConfigPortal("door-config");
@@ -270,13 +299,16 @@ static void start_config_portal(wifimon_t *pstate)
 
     // save mqtt data
     strncpy(pstate->pmqtt_server, custom_mqtt_server.getValue(), WIFIMON_MAX_LEN_MQTT_SERVER);
-    strncpy(pstate->pmqtt_port, custom_mqtt_port.getValue(), WIFIMON_MAX_LEN_MQTT_PORT);
-    Serial.println("\tmqtt_server : " + String(pstate->pmqtt_server));
-    Serial.println("\tmqtt_port : " + String(pstate->pmqtt_port));
+
+    short tmp_port = (short)atoi(custom_mqtt_port.getValue());
+    if ((tmp_port < 0) || (tmp_port > 1024))
+    {
+        tmp_port = 0;
+    }
+    Serial.printf("mqtt_server : %s\n", pstate->pmqtt_server);
+    Serial.printf("mqtt_port : %d\n", pstate->mqtt_port);
     wifimon_write_mqtt_params_to_file(pstate->pmqtt_server,
-                                      WIFIMON_MAX_LEN_MQTT_SERVER,
-                                      pstate->pmqtt_port,
-                                      WIFIMON_MAX_LEN_MQTT_PORT);
+                                      pstate->mqtt_port);
     
     if (pstate->enable_restart)
     {
@@ -286,48 +318,9 @@ static void start_config_portal(wifimon_t *pstate)
     }
 }
 
-static void do_transitions(wifimon_t *pstate, wifimon_state_t next_state)
-{
-    if (next_state==pstate->curr_state)
-    {
-        ; // do nothing
-    }
-    else
-    {
-        Serial.printf("do_transitions: %s -> %s\n", state_to_string(pstate->curr_state), state_to_string(next_state));
-        switch(next_state)
-        {
-        case WM_CHECK_RECONFIG_BTN:
-            pstate->start_time = millis();  // elapsed time button press
-            break;
-            
-        case WM_RECONFIG:
-            break;
-
-        case WM_NOT_CONNECTED:
-            pstate->start_time = millis(); // elapsed time disconnected
-            break;
-
-        case WM_CONNECTED:
-            pstate->led_counter = 1;
-            //tx_send("connected_to_wifi","");
-            break;
-
-        case WM_REBOOT:
-            break;
-
-        default:
-            // shouldn't ever reach this point
-            Serial.printf("wifimon::do_transitions illegal state %s\n", state_to_string(pstate->curr_state));
-            UTILS_ASSERT(0);
-            
-        }
-        pstate->curr_state = next_state;
-    }
-}
-
 static void do_steadystate(wifimon_t *pstate)
 {
+    Serial.printf("STEADY STATE (%s)\n", state_to_string(pstate->curr_state));
     switch(pstate->curr_state)
     {
     case WM_INIT:
@@ -335,6 +328,7 @@ static void do_steadystate(wifimon_t *pstate)
 
     case WM_CHECK_RECONFIG_BTN:
         pstate->led_counter++;
+        pstate->reconfig_loop_cnt++;
         if ((pstate->led_counter % LED_FAST_BLINK)==0)
         {
             pstate->led_state ^= 1;
@@ -378,11 +372,8 @@ static void do_steadystate(wifimon_t *pstate)
 
 wifimon_state_t wifimon_update(wifimon_t *pstate)
 {
-    wifimon_state_t next_state;
-    next_state = do_update_logic(pstate);
-
-    do_transitions(pstate, next_state);
     do_steadystate(pstate);
+    pstate->curr_state = do_update_logic(pstate);
 
     return pstate->curr_state;
 }
