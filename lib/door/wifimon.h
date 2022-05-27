@@ -48,7 +48,7 @@ typedef struct
 void wifimon_init(wifimon_t *pstate, int led_pin, int reconfig_button_pin);
 wifimon_state_t wifimon_update(wifimon_t *pstate);
 void wifimon_force_transition(wifimon_t *pstate, wifimon_state_t next_state);
-void wifimon_print_info(void);
+void wifimon_print_info(WiFiManager *wm, wifimon_t *pstate);
 void wifimon_write_mqtt_params_to_file(const char *pmqtt_server,
                                        short mqtt_port);
 void wifimon_read_mqtt_params_from_file(char *pmqtt_server,

@@ -76,10 +76,10 @@ void test_open_ap_portal_then_quit(void)
     WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP IS THIS NECESSARY?
     wm.debugPlatformInfo();
     wm.setConfigPortalTimeout(5); // return from config portal after N seconds, no matter what
-    wifimon_print_info();
+    wifimon_print_info(&wm, NULL);
     wm.startConfigPortal("door-config");
 
-    wifimon_print_info();
+    wifimon_print_info(&wm, NULL);
 
     TEST_ASSERT_TRUE(wm.getWiFiIsSaved()==1);
 }
@@ -205,7 +205,7 @@ void test_loop(void)
                  BTN_RESET);
     wifimon_state.threshold_reconfig_sec = 30;
     
-    for (n=0;n<6;n++)
+    for (n=0;n<10;n++)
     {
         Serial.printf("\n");
         Serial.printf("\niteration %d\n",n);
@@ -218,13 +218,13 @@ void test_loop(void)
 }
 
 void loop() {
-    // RUN_TEST(test_init_and_quit);
-    // RUN_TEST(test_open_ap_portal_then_quit);
-    // RUN_TEST(test_force_reconfig);
-    // RUN_TEST(test_led_check_reconfig);
-    // RUN_TEST(test_led_connected);
+    RUN_TEST(test_init_and_quit);
+    RUN_TEST(test_open_ap_portal_then_quit);
+    RUN_TEST(test_force_reconfig);
+    RUN_TEST(test_led_check_reconfig);
+    RUN_TEST(test_led_connected);
     RUN_TEST(test_wifi_param_file_read_write);
 
-    //RUN_TEST(test_loop);
+    RUN_TEST(test_loop);
     UNITY_END();
 }

@@ -91,8 +91,11 @@ void wifimon_print_info(WiFiManager *wm, wifimon_t *pstate)
     Serial.printf("  PASS: %s\n", wm->getWiFiPass().c_str());;
     Serial.printf("  Connected: %d\n", WiFi.status()==WL_CONNECTED);
     Serial.printf("\n");
-    Serial.printf("  mqtt server: %s\n", pstate->pmqtt_server);
-    Serial.printf("  mqtt port: %d\n", pstate->mqtt_port);
+    if (pstate)
+    {
+        Serial.printf("  mqtt server: %s\n", pstate->pmqtt_server);
+        Serial.printf("  mqtt port: %d\n", pstate->mqtt_port);
+    }
     Serial.printf("====================================\n");
 }
 
