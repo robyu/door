@@ -167,7 +167,7 @@ or
 https://docs.google.com/drawings/d/1ZojjvD8IzcoGZNFNz5XOvnSn9KmD7tuCvef_ixaX7fY/edit?usp=sharing
 */
 
-static wifimon_state_t do_update_logic(wifimon_t *pstate)
+static wifimon_state_t do_transitions(wifimon_t *pstate)
 {
     wifimon_state_t next_state;
     int reset_button = switch_update_state(&pstate->reset_button);
@@ -376,7 +376,7 @@ static void do_steadystate(wifimon_t *pstate)
 wifimon_state_t wifimon_update(wifimon_t *pstate)
 {
     do_steadystate(pstate);
-    pstate->curr_state = do_update_logic(pstate);
+    pstate->curr_state = do_transitions(pstate);
 
     return pstate->curr_state;
 }
