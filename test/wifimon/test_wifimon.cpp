@@ -8,8 +8,32 @@
 #include <ESP8266WiFi.h> 
 #include <WiFiManager.h>
 #include "utils.h"
+#include "json_config.h"
 
 wifimon_t wifimon_state;
+
+#define JSONFNAME "/unit_tests.json"
+
+void get_wifi_credential(const char *fname, char *ssid_ptr, size_t len_ssid, char *pwd_ptr, size_t len_pwd)
+{
+    DynamicJsonDocument json(1024);
+    jc_get_config_from_file(fname, &json);
+    
+    Serial.printf("ssid=(%s)\n",
+                  (const char *)json["wifi_access"]["ssid"]);
+    Serial.printf("pwd=(%s)\n",
+                  (const char *)json["wifi_access"]["pwd"]);
+
+    TEST_ASSERT_TRUE(strlen((const char *)json["wifi_access"]["ssid"]) < len_ssid);
+    strncpy(ssid_ptr,
+            json["wifi_access"]["ssid"].as<const char *>(),
+            len_ssid);
+
+    TEST_ASSERT_TRUE(strlen((const char *)json["wifi_access"]["pwd"]) < len_pwd);
+    strncpy(pwd_ptr,
+            json["wifi_access"]["pwd"].as<const char *>(),
+            len_pwd);
+}
 
 void setup() {
     Serial.begin(115200);
@@ -205,26 +229,50 @@ void test_loop(void)
                  BTN_RESET);
     wifimon_state.threshold_reconfig_sec = 30;
     
-    for (n=0;n<10;n++)
+    n = 0;
+    while((n < 30) && (wifimon_state.curr_state != WM_CONNECTED))
     {
         Serial.printf("\n");
         Serial.printf("\niteration %d\n",n);
         wifimon_update(&wifimon_state);
         delay(1000);
+        n++;
     }
 
     Serial.printf("exit\n");
-    TEST_ASSERT_TRUE(true);
+    TEST_ASSERT_TRUE(wifimon_state.curr_state == WM_CONNECTED);
+}
+
+void test_wifi_begin(void)
+{
+    WiFiManager wm;
+    char pssid[255];
+    char ppwd[255];
+    int n;
+    
+    get_wifi_credential(JSONFNAME, pssid, 255, ppwd, 255);
+
+    WiFi.mode(WIFI_STA);  
+    WiFi.begin(pssid, ppwd);
+    delay(1000);
+    for (n=0;n<20;n++)
+    {
+        Serial.printf("[%d] connections status = %d\n", n, WiFi.status()==WL_CONNECTED);
+        delay(500);
+    }
+    TEST_ASSERT_TRUE(WiFi.status()==WL_CONNECTED);
+    
 }
 
 void loop() {
-    RUN_TEST(test_init_and_quit);
-    RUN_TEST(test_open_ap_portal_then_quit);
-    RUN_TEST(test_force_reconfig);
-    RUN_TEST(test_led_check_reconfig);
-    RUN_TEST(test_led_connected);
-    RUN_TEST(test_wifi_param_file_read_write);
+    // RUN_TEST(test_init_and_quit);
+    // RUN_TEST(test_open_ap_portal_then_quit);
+    // RUN_TEST(test_force_reconfig);
+    // RUN_TEST(test_led_check_reconfig);
+    // RUN_TEST(test_led_connected);
+    // RUN_TEST(test_wifi_param_file_read_write);
 
     RUN_TEST(test_loop);
+    //RUN_TEST(test_wifi_begin);
     UNITY_END();
 }

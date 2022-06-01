@@ -23,6 +23,8 @@ blink intervals assume delay(100) in main loop
 #define LED_SLOW_BLINK 10
 #define LED_FAST_BLINK  1
 
+#define PORTAL_TIMEOUT_SEC 60
+
 WiFiManager wifi_manager;
 
 /*
@@ -38,7 +40,6 @@ static const char* state_to_string(wifimon_state_t state)
         ENUM_DESCR_DECLARE(WM_RECONFIG),
         ENUM_DESCR_DECLARE(WM_NOT_CONNECTED),
         ENUM_DESCR_DECLARE(WM_CONNECTED),
-        ENUM_DESCR_DECLARE(WM_REBOOT),
         ENUM_DESCR_DECLARE(WM_LAST_DONT_USE),
         ENUM_DESCR_END
     };
@@ -84,12 +85,13 @@ void wifimon_read_mqtt_params_from_file(char *pmqtt_server,
 void wifimon_print_info(WiFiManager *wm, wifimon_t *pstate)
 {
     Serial.printf("  WIFIMON INFO PARAMS=====================\n");
-    WiFi.printDiag(Serial);
-    Serial.printf("  -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=\n");
     Serial.printf("  SAVED: %d\n",  wm->getWiFiIsSaved() );
     Serial.printf("  SSID: %s\n", wm->getWiFiSSID().c_str());
     Serial.printf("  PASS: %s\n", wm->getWiFiPass().c_str());;
     Serial.printf("  Connected: %d\n", WiFi.status()==WL_CONNECTED);
+    Serial.printf("  -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=\n");
+    WiFi.printDiag(Serial);
+    Serial.printf("  -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=\n");
     Serial.printf("\n");
     if (pstate)
     {
@@ -138,8 +140,6 @@ void wifimon_init(wifimon_t *pstate, int led_pin, int reconfig_button_pin)
     // force station mode because if device was switched off while in access point mode,
     // it will startup in access point mode again
     // see https://github.com/kentaylor/WiFiManager/blob/master/examples/ConfigOnSwitch/ConfigOnSwitch.ino#L46
-    WiFi.mode(WIFI_STA);  
-
     pstate->curr_state = WM_INIT;
     pstate->threshold_check_reset_ms = 1000;
     pstate->threshold_reconfig_button_ms = 5000;
@@ -196,8 +196,14 @@ static wifimon_state_t do_transitions(wifimon_t *pstate)
                 // so continue to next state
                 //
                 // we need to wait to give button time to settle; otherwise may not be detected
+                WiFi.mode(WIFI_STA);  
                 next_state = WM_NOT_CONNECTED;
+
                 pstate->start_time = millis(); // elapsed time disconnected
+                Serial.printf("wifimon: calling WiFi.begin()\n");
+                wifimon_print_info(&wifi_manager, pstate);
+                WiFi.begin();
+                Serial.printf("wifimon: returned from WiFi.begin()\n");
             }
         }
         else
@@ -218,31 +224,28 @@ static wifimon_state_t do_transitions(wifimon_t *pstate)
         break;
 
     case WM_RECONFIG:
-        // we don't expect to end up here, so something went wrong.
-        // reboot.
-        // transition:  reboot
-        next_state = WM_REBOOT;
+        // should never reach this state
+        UTILS_ASSERT(0);
         break;
 
     case WM_NOT_CONNECTED:
+    {
+        long elapsed_ms = utils_get_elapsed_msec_and_reset(&pstate->start_time);
         // see https://www.arduino.cc/en/Reference/WiFiStatus
         //Serial.println("WiFi.status = " + String(WiFi.status()));
+
+        //
+        // assume that wifi will eventually connect
+        // (usually takes 8-10 sec)
+        // leave it up to higher level state machine to reboot if necessary
+        
+        Serial.printf("WM_NOT_CONNECTED: elapsed time = (%f) sec\n",elapsed_ms/1000.0);
         if (wifi_is_connected(pstate)==1)
         {
             next_state = WM_CONNECTED;
         }
-        else if (utils_get_elapsed_msec_and_reset(&pstate->start_time) > pstate->threshold_not_connected_ms)
-        {
-            // we've been disconnected for too long
-            next_state = WM_REBOOT;
-        }
-        else
-        {
-            Serial.printf("wifimon:do_update NOT_CONNECTED state for (%ld) msec\n", utils_get_elapsed_msec_and_reset(&pstate->start_time));
-        }
-        
-            
         break;
+    }
 
     case WM_CONNECTED:
         //Serial.println("WiFi.status = " + String(WiFi.status()));
@@ -252,9 +255,6 @@ static wifimon_state_t do_transitions(wifimon_t *pstate)
         }
         break;
 
-    case WM_REBOOT:
-        break;
-        
     default:
         Serial.println("wifimon::do_update illegal state " + String(state_to_string(pstate->curr_state)));
         UTILS_ASSERT(0);
@@ -292,7 +292,7 @@ static void start_config_portal(wifimon_t *pstate)
     //useful to make it all retry or go to sleep
     //in seconds
     //wifi_manager.setConfigPortalTimeout(pstate->threshold_reconfig_sec);
-    wifi_manager.setConfigPortalTimeout(45);
+    wifi_manager.setConfigPortalTimeout(PORTAL_TIMEOUT_SEC);
 
     Serial.println("start_config_portal");
     bool is_connected = wifi_manager.startConfigPortal("door-config");
@@ -323,7 +323,7 @@ static void start_config_portal(wifimon_t *pstate)
 
 static void do_steadystate(wifimon_t *pstate)
 {
-    Serial.printf("STEADY STATE (%s)\n", state_to_string(pstate->curr_state));
+    Serial.printf("wifimon STEADY STATE (%s)\n", state_to_string(pstate->curr_state));
     switch(pstate->curr_state)
     {
     case WM_INIT:
@@ -348,7 +348,6 @@ static void do_steadystate(wifimon_t *pstate)
 
     case WM_NOT_CONNECTED:
         utils_set_led(pstate->led_pin, 0); // dead LED
-        wifi_manager.autoConnect();
         break;
       
     case WM_CONNECTED:
@@ -361,13 +360,6 @@ static void do_steadystate(wifimon_t *pstate)
         }
         break;
 
-    case WM_REBOOT:
-        utils_set_led(pstate->led_pin, 0); // blank LED
-        if (pstate->enable_restart)
-        {
-            utils_restart();
-        }
-        break;
     default:
         UTILS_ASSERT(0);
     }
