@@ -265,14 +265,14 @@ void test_wifi_begin(void)
 }
 
 void loop() {
-    // RUN_TEST(test_init_and_quit);
-    // RUN_TEST(test_open_ap_portal_then_quit);
-    // RUN_TEST(test_force_reconfig);
-    // RUN_TEST(test_led_check_reconfig);
-    // RUN_TEST(test_led_connected);
-    // RUN_TEST(test_wifi_param_file_read_write);
+    RUN_TEST(test_init_and_quit);
+    RUN_TEST(test_open_ap_portal_then_quit);
+    RUN_TEST(test_force_reconfig);
+    RUN_TEST(test_led_check_reconfig);
+    RUN_TEST(test_led_connected);
+    RUN_TEST(test_wifi_param_file_read_write);
 
     RUN_TEST(test_loop);
-    //RUN_TEST(test_wifi_begin);
+    RUN_TEST(test_wifi_begin);
     UNITY_END();
 }
