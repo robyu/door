@@ -56,7 +56,8 @@ static void rx_callback(char *ptopic, byte *ppayload, unsigned int length)
     return;
 }
 
-bool connect_mqtt_broker(mqttif_t *p)
+#if 0
+bool connect_mqtt_brokerNOTINUSE(mqttif_t *p)
 {
     int count = 0;
     PubSubClient *pmqtt_client = p->pmqtt_client;
@@ -94,6 +95,7 @@ bool connect_mqtt_broker(mqttif_t *p)
     }
     return pmqtt_client->connected();
 }
+#endif
 
 static bool connect_mqtt_broker(PubSubClient *pmqtt_client)
 {
@@ -132,12 +134,10 @@ void mqttif_init(mqttif_t *p, const mqttif_config_t *pconfig)
     p->pmqtt_client = pmqtt_client;
     pmqttif_global = p;
 
-    Serial.printf("mqttif_init: broker addr=%s\n",pconfig->pbroker_addr);
-    Serial.printf("mqttif_init: port=%d\n",pconfig->mqtt_port);
+    Serial.printf("  mqttif_init: using broker addr=%s\n",pconfig->pbroker_addr);
+    Serial.printf("  mqttif_init: using port=%d\n",pconfig->mqtt_port);
     pmqtt_client->setServer(pconfig->pbroker_addr, pconfig->mqtt_port);
     pmqtt_client->setCallback(rx_callback);
-
-    connect_mqtt_broker(p->pmqtt_client);
 }
 
 bool mqttif_is_connected(const mqttif_t *p)
