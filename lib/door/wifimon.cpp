@@ -64,7 +64,7 @@ static int wifi_is_connected(const wifimon_t *pstate)
 #define MQTT_FNAME "/mqtt_params.txt"
 
 void wifimon_read_mqtt_params_from_file(char *pmqtt_server,
-                                        short *pmqtt_port)
+                                        int *pmqtt_port)
 
 {
     File file;
@@ -79,6 +79,12 @@ void wifimon_read_mqtt_params_from_file(char *pmqtt_server,
         file.readBytes(pmqtt_server, WIFIMON_MAX_LEN_MQTT_SERVER);
         file.readBytes((char *)pmqtt_port, sizeof(*pmqtt_port));
     }
+
+    Serial.printf("wifimon_read_mqtt_params_from_file:\n");
+    Serial.printf("  mqtt server: %s\n", pmqtt_server);
+    Serial.printf("  mqtt port: %d\n", *pmqtt_port);
+
+    
     return;
 }
 
@@ -102,7 +108,7 @@ void wifimon_print_info(WiFiManager *wm, wifimon_t *pstate)
 }
 
 void wifimon_write_mqtt_params_to_file(const char *pmqtt_server,
-                                       short mqtt_port)
+                                       int mqtt_port)
 {
     File file;
     file = LittleFS.open(MQTT_FNAME, "w");
@@ -280,8 +286,12 @@ static wifimon_state_t do_transitions(wifimon_t *pstate)
 static void start_config_portal(wifimon_t *pstate)
 {
     char pmqtt_port_char[WIFIMON_MAX_LEN_MQTT_SERVER];
+    
+    UTILS_ZERO_STRUCT(pmqtt_port_char);
     strncpy(pmqtt_port_char, String(pstate->mqtt_port).c_str(), WIFIMON_MAX_LEN_MQTT_SERVER);
 
+    // see WiFiManager.cpp for ctor definitions
+    // WiFiManagerParameter::WiFiManagerParameter(const char *id, const char *label, const char *defaultValue, int length) {
     WiFiManagerParameter custom_mqtt_server("server", "mqtt server", pstate->pmqtt_server, WIFIMON_MAX_LEN_MQTT_SERVER);
     WiFiManagerParameter custom_mqtt_port("port", "mqtt port", pmqtt_port_char, WIFIMON_MAX_LEN_MQTT_SERVER);
 
@@ -303,11 +313,20 @@ static void start_config_portal(wifimon_t *pstate)
     // save mqtt data
     strncpy(pstate->pmqtt_server, custom_mqtt_server.getValue(), WIFIMON_MAX_LEN_MQTT_SERVER);
 
-    short tmp_port = (short)atoi(custom_mqtt_port.getValue());
-    if ((tmp_port < 0) || (tmp_port > 1024))
+    Serial.printf("==============================================\n");
+    Serial.printf("custom_mqtt_port.getValue() = (%s)\n", custom_mqtt_port.getValue());
+    Serial.printf("pmqtt_port_char = (%s)\n", pmqtt_port_char);
+    Serial.printf("==============================================\n");
+
+    
+    //short tmp_port = (short)atoi(custom_mqtt_port.getValue());
+    int tmp_port = (unsigned short)atoi(custom_mqtt_port.getValue());
+    if ((tmp_port < 0) || (tmp_port > 65535))
     {
         tmp_port = 0;
     }
+    Serial.printf("tmp_port = (%d)\n",tmp_port);
+    pstate->mqtt_port = tmp_port;
     Serial.printf("mqtt_server : %s\n", pstate->pmqtt_server);
     Serial.printf("mqtt_port : %d\n", pstate->mqtt_port);
     wifimon_write_mqtt_params_to_file(pstate->pmqtt_server,

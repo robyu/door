@@ -20,8 +20,8 @@ typedef enum
     SENSOR_DONT_USE = 0,
     SENSOR_INIT,
     SENSOR_SETUP_WIFI,
-    SENSOR_WIFI_OFFLINE,
-    SENSOR_OFFLINE,
+    SENSOR_WAIT_WIFI_CONNECT,
+    SENSOR_WAIT_MQTT_CONNECT,
     SENSOR_ONLINE,
     SENSOR_REBOOT,
     SENSOR_LAST_DONT_USE
@@ -64,8 +64,8 @@ static const char* state_to_string(sensor_state_t state)
         ENUM_DESCR_DECLARE(SENSOR_DONT_USE),
         ENUM_DESCR_DECLARE(SENSOR_INIT),
         ENUM_DESCR_DECLARE(SENSOR_SETUP_WIFI),
-        ENUM_DESCR_DECLARE(SENSOR_WIFI_OFFLINE),
-        ENUM_DESCR_DECLARE(SENSOR_OFFLINE),
+        ENUM_DESCR_DECLARE(SENSOR_WAIT_WIFI_CONNECT),
+        ENUM_DESCR_DECLARE(SENSOR_WAIT_MQTT_CONNECT),
         ENUM_DESCR_DECLARE(SENSOR_ONLINE),
         ENUM_DESCR_DECLARE(SENSOR_REBOOT),
         ENUM_DESCR_DECLARE(SENSOR_LAST_DONT_USE),
@@ -93,14 +93,14 @@ void setup()
 void init_mqttif(sensor_t *psensor)
 {
     char pmqtt_server[WIFIMON_MAX_LEN_MQTT_SERVER];
-    short mqtt_port;
+    int mqtt_port;
     mqttif_config_t config;
 
     Serial.printf("  init_mqtt: initialize MQTT\n");
     wifimon_read_mqtt_params_from_file(pmqtt_server,
                                        &mqtt_port);
     Serial.printf("  mqtt_server: (%s), port (%d)\n", pmqtt_server, mqtt_port);
-    UTILS_ASSERT((mqtt_port >= 0) && (mqtt_port <= 1024));
+    UTILS_ASSERT((mqtt_port >= 0) && (mqtt_port <= 65535));
     mqttif_set_default_config(&config, pmqtt_server, mqtt_port);
     mqttif_init(&psensor->mqttif, &config);
     Serial.printf("  init_mqtt: exit\n");
@@ -129,14 +129,14 @@ static void do_steadystate(sensor_t *psensor)
         psensor->wifimon_state = wifimon_update(&psensor->wifimon);
         break;
 
-    case SENSOR_WIFI_OFFLINE:
+    case SENSOR_WAIT_WIFI_CONNECT:
         psensor->wifimon_state = wifimon_update(&psensor->wifimon);
         psensor->reset_btn_longpress = reboot_update_state(&psensor->rebooter);
         psensor->wifi_fail_counter++;
         break;
         
 
-    case SENSOR_OFFLINE:
+    case SENSOR_WAIT_MQTT_CONNECT:
         psensor->wifimon_state = wifimon_update(&psensor->wifimon);
         psensor->reset_btn_longpress = reboot_update_state(&psensor->rebooter);
         mqttif_update(&psensor->mqttif);
@@ -182,11 +182,11 @@ sensor_state_t do_transitions(sensor_t *psensor)
         if ((psensor->wifimon_state==WM_NOT_CONNECTED) || (psensor->wifimon_state==WM_CONNECTED))
         {
             psensor->state_start_time = millis(); 
-            next_state = SENSOR_WIFI_OFFLINE;
+            next_state = SENSOR_WAIT_WIFI_CONNECT;
         }
         break;
 
-    case SENSOR_WIFI_OFFLINE:
+    case SENSOR_WAIT_WIFI_CONNECT:
         if (psensor->reset_btn_longpress) 
         {
             Serial.printf("detected reset button long press\n");
@@ -197,23 +197,23 @@ sensor_state_t do_transitions(sensor_t *psensor)
             //
             // wifi is up, so init mqtt interface
             init_mqttif(psensor);
-            next_state = SENSOR_OFFLINE;
+            next_state = SENSOR_WAIT_MQTT_CONNECT;
 
         }
         else if (psensor->wifimon_state==WM_NOT_CONNECTED)
         {
             long elapsed_ms = utils_get_elapsed_msec_and_reset(&psensor->state_start_time);
             
-            Serial.printf("SENSOR_WIFI_OFFLINE: waiting for wifi connect for (%f) sec\n", elapsed_ms/1000.0);
+            Serial.printf("SENSOR_WAIT_WIFI_CONNECT: waiting for wifi connect for (%f) sec\n", elapsed_ms/1000.0);
             if (elapsed_ms > THRESH_WAIT_FOR_WIFI_CONNECT_MS)
             {
-                Serial.printf("SENSOR_WIFI_OFFLINE: exceeded wait time threshold; rebooting\n");
+                Serial.printf("SENSOR_WAIT_WIFI_CONNECT: exceeded wait time threshold; rebooting\n");
                 next_state = SENSOR_REBOOT;
             }
         }
         break;
 
-    case SENSOR_OFFLINE:
+    case SENSOR_WAIT_MQTT_CONNECT:
     {
         bool mqttif_connected = mqttif_is_connected(&psensor->mqttif);
         
@@ -225,7 +225,7 @@ sensor_state_t do_transitions(sensor_t *psensor)
         else if (psensor->wifimon_state==WM_NOT_CONNECTED)
         {
             Serial.printf("lost wifi connection\n");
-            next_state = SENSOR_WIFI_OFFLINE;
+            next_state = SENSOR_WAIT_WIFI_CONNECT;
         }
         else if (mqttif_connected)
         {
@@ -243,7 +243,7 @@ sensor_state_t do_transitions(sensor_t *psensor)
     case SENSOR_ONLINE:
         if (false==mqttif_is_connected(&psensor->mqttif))
         {
-            next_state = SENSOR_OFFLINE;
+            next_state = SENSOR_WAIT_MQTT_CONNECT;
         }
         else if ((psensor->reset_btn_longpress) || (psensor->mqtt_reboot_request))
         {

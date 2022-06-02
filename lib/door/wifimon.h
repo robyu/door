@@ -36,7 +36,7 @@ typedef struct
     int reconfig_loop_cnt;
 
     char pmqtt_server[WIFIMON_MAX_LEN_MQTT_SERVER];
-    short mqtt_port;
+    int mqtt_port;
     
     // for debugging
     wifimon_state_t debug_next_state;
@@ -50,9 +50,9 @@ wifimon_state_t wifimon_update(wifimon_t *pstate);
 void wifimon_force_transition(wifimon_t *pstate, wifimon_state_t next_state);
 void wifimon_print_info(WiFiManager *wm, wifimon_t *pstate);
 void wifimon_write_mqtt_params_to_file(const char *pmqtt_server,
-                                       short mqtt_port);
+                                       int mqtt_port);
 void wifimon_read_mqtt_params_from_file(char *pmqtt_server,
-                                        short *pmqtt_port);
+                                        int *pmqtt_port);
 
 #endif // switch_h
 
