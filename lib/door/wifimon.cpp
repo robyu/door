@@ -248,6 +248,8 @@ static wifimon_state_t do_transitions(wifimon_t *pstate)
         Serial.printf("WM_NOT_CONNECTED: elapsed time = (%f) sec\n",elapsed_ms/1000.0);
         if (wifi_is_connected(pstate)==1)
         {
+            IPAddress ipaddr = WiFi.localIP();
+            Serial.printf("WM_CONNECTED: got IP address (%s)\n", ipaddr.toString().c_str());
             next_state = WM_CONNECTED;
         }
         break;
@@ -257,6 +259,7 @@ static wifimon_state_t do_transitions(wifimon_t *pstate)
         //Serial.println("WiFi.status = " + String(WiFi.status()));
         if (wifi_is_connected(pstate)==0)
         {
+            Serial.printf("WM_CONNECTED: lost WiFi connection!\n");
             next_state = WM_NOT_CONNECTED;
         }
         break;

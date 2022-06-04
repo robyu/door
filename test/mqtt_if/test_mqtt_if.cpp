@@ -9,6 +9,7 @@
 
 // MQTT Broker Parameters
 static char public_mqtt_broker[512];
+static char local_mqtt_broker[512];
 static char mqtt_topic[MQTTIF_MAX_LEN_STR];
 static int mqtt_port;
 
@@ -26,7 +27,7 @@ void setup(void) {
 
     get_broker_params(JSONFNAME,
                       public_mqtt_broker,
-                      NULL,
+                      local_mqtt_broker,
                       sizeof(public_mqtt_broker),
                       mqtt_topic,
                       sizeof(mqtt_topic),
@@ -48,8 +49,34 @@ void test_connect_public_broker(void)
     
     mqttif_init(&mqttif, &config);
 
-    Serial.printf("===================================================\n");
+    // must call mqttif_update at least once
+    mqttif_update(&mqttif);
 
+    connected = mqttif_is_connected(&mqttif);
+    Serial.printf("connected=%d\n",(int)connected);
+    TEST_ASSERT_TRUE(connected==true);
+
+    mqttif_disconnect(&mqttif);
+
+}
+
+void test_connect_local_broker(void)
+{
+    mqttif_config_t config;
+    mqttif_t mqttif;
+    bool connected;
+
+    TEST_ASSERT(WiFi.status()==WL_CONNECTED);
+
+    
+    Serial.printf("===================================================\n");
+    mqttif_set_default_config(&config, local_mqtt_broker, mqtt_port);
+    
+    mqttif_init(&mqttif, &config);
+
+    // must call mqttif_update at least once
+    mqttif_update(&mqttif);
+    
     connected = mqttif_is_connected(&mqttif);
     Serial.printf("connected=%d\n",(int)connected);
     TEST_ASSERT_TRUE(connected==true);
@@ -62,7 +89,7 @@ void test_pub_sub(void)
 {
     mqttif_config_t config;
     mqttif_t mqttif;
-    char topic[] = "home/garage/door";
+    char topic[] = "/home/test/mqtt_if";
     boolean retval;
     char prx_topic[MQTTIF_MAX_LEN_STR];
     char prx_payload[MQTTIF_MAX_LEN_STR];
@@ -107,6 +134,7 @@ void test_pub_sub(void)
 
 void loop() {
     RUN_TEST(test_connect_public_broker);
+    RUN_TEST(test_connect_local_broker);
     RUN_TEST(test_pub_sub);
     UNITY_END();
 }

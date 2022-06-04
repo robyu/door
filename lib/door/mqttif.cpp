@@ -133,10 +133,14 @@ void mqttif_init(mqttif_t *p, const mqttif_config_t *pconfig)
     p->config = *pconfig;
     p->pmqtt_client = pmqtt_client;
     pmqttif_global = p;
+    Serial.printf("  mqttif_init() ======================\n");
+    Serial.printf("  mqttif_init: using broker addr=(%s)\n",p->config.pbroker_addr);
+    Serial.printf("  mqttif_init: using port=(%d)\n",p->config.mqtt_port);
 
-    Serial.printf("  mqttif_init: using broker addr=%s\n",pconfig->pbroker_addr);
-    Serial.printf("  mqttif_init: using port=%d\n",pconfig->mqtt_port);
-    pmqtt_client->setServer(pconfig->pbroker_addr, pconfig->mqtt_port);
+    // DO NOT pass pointers to pconfig to PubSubClient.setServer, because
+    // pconfig might be on the stack and PubSubClient merely copies the pointer.
+    // jeezus
+    pmqtt_client->setServer(p->config.pbroker_addr, p->config.mqtt_port);
     pmqtt_client->setCallback(rx_callback);
 }
 

@@ -39,9 +39,12 @@ void get_broker_params(const char *fname,
     jc_get_config_from_file(fname, &json);
 
     pc = json["test_mqtt"]["public_mqtt_broker"];
-    TEST_ASSERT_TRUE(strlen(pc) < max_len_broker);
-    strncpy(public_mqtt_broker, pc,  max_len_broker);
-    Serial.printf("public mqtt broker = (%s)\n", public_mqtt_broker);
+    if (public_mqtt_broker != NULL)
+    {
+        TEST_ASSERT_TRUE(strlen(pc) < max_len_broker);
+        strncpy(public_mqtt_broker, pc,  max_len_broker);
+        Serial.printf("public mqtt broker = (%s)\n", public_mqtt_broker);
+    }
 
     pc = json["test_mqtt"]["local_mqtt_broker"];
     if (local_mqtt_broker != NULL)

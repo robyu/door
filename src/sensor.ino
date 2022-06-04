@@ -11,9 +11,11 @@
 #define LOOP_DELAY_MS (1000*1)
 #define THRESH_DOOR_OPEN_MS (1000*60)
 
-// typically it takes 8-10 sec to establish wifi connection
-// after calling WiFi.begin(0
+// wifi typically it takes 8-10 sec to establish connection after calling WiFi.begin
 #define THRESH_WAIT_FOR_WIFI_CONNECT_MS (1000 * 30)
+
+// mqtt typically connect immediately
+#define THRESH_WAIT_FOR_MQTT_CONNECT_MS (1000 * 5)
 
 typedef enum
 {
@@ -36,9 +38,9 @@ typedef struct
     mqttif_t mqttif;
 
     int mqtt_reboot_request;
-    int wifi_fail_counter;
     float door_open_duration_ms;
     long state_start_time;
+    long state_elapsed_ms;
 
     int reset_btn_longpress;
     wifimon_state_t wifimon_state;
@@ -132,13 +134,14 @@ static void do_steadystate(sensor_t *psensor)
     case SENSOR_WAIT_WIFI_CONNECT:
         psensor->wifimon_state = wifimon_update(&psensor->wifimon);
         psensor->reset_btn_longpress = reboot_update_state(&psensor->rebooter);
-        psensor->wifi_fail_counter++;
+        psensor->state_elapsed_ms = utils_get_elapsed_msec_and_reset(&psensor->state_start_time);
         break;
         
 
     case SENSOR_WAIT_MQTT_CONNECT:
         psensor->wifimon_state = wifimon_update(&psensor->wifimon);
         psensor->reset_btn_longpress = reboot_update_state(&psensor->rebooter);
+        psensor->state_elapsed_ms = utils_get_elapsed_msec_and_reset(&psensor->state_start_time);
         mqttif_update(&psensor->mqttif);
         break;
          
@@ -146,6 +149,7 @@ static void do_steadystate(sensor_t *psensor)
         psensor->wifimon_state = wifimon_update(&psensor->wifimon);
         psensor->reset_btn_longpress = reboot_update_state(&psensor->rebooter);
         mqttif_update(&psensor->mqttif);
+
         handle_mqtt_rx(psensor);
 
         psensor->prev_doormon_state = psensor->doormon_state;
@@ -197,15 +201,22 @@ sensor_state_t do_transitions(sensor_t *psensor)
             //
             // wifi is up, so init mqtt interface
             init_mqttif(psensor);
+
+            Serial.printf("== MQTTIF: RUNNING UPDATE RIGHT NOW\n");
+            mqttif_update(&psensor->mqttif);
+            Serial.printf("== MQTTIF: DONE\n");
+            
+            
+            psensor->state_start_time = millis(); 
             next_state = SENSOR_WAIT_MQTT_CONNECT;
 
         }
-        else if (psensor->wifimon_state==WM_NOT_CONNECTED)
+        else //(psensor->wifimon_state==WM_NOT_CONNECTED)
         {
-            long elapsed_ms = utils_get_elapsed_msec_and_reset(&psensor->state_start_time);
+            UTILS_ASSERT(psensor->wifimon_state == WM_NOT_CONNECTED);
             
-            Serial.printf("SENSOR_WAIT_WIFI_CONNECT: waiting for wifi connect for (%f) sec\n", elapsed_ms/1000.0);
-            if (elapsed_ms > THRESH_WAIT_FOR_WIFI_CONNECT_MS)
+            Serial.printf("SENSOR_WAIT_WIFI_CONNECT: waiting for wifi connect for (%f) sec\n", psensor->state_elapsed_ms/1000.0);
+            if (psensor->state_elapsed_ms > THRESH_WAIT_FOR_WIFI_CONNECT_MS)
             {
                 Serial.printf("SENSOR_WAIT_WIFI_CONNECT: exceeded wait time threshold; rebooting\n");
                 next_state = SENSOR_REBOOT;
@@ -225,17 +236,25 @@ sensor_state_t do_transitions(sensor_t *psensor)
         else if (psensor->wifimon_state==WM_NOT_CONNECTED)
         {
             Serial.printf("lost wifi connection\n");
+            psensor->state_start_time = millis(); 
             next_state = SENSOR_WAIT_WIFI_CONNECT;
         }
         else if (mqttif_connected)
         {
+STOPPED HERE
             Serial.printf("MQTT server connected\n");
-            next_state = SENSOR_ONLINE;
-        }
-        else if (mqttif_connected==false)
-        {
-            Serial.printf("MQTT server connection failed -- REBOOT\n");
+            //next_state = SENSOR_ONLINE;
             next_state = SENSOR_REBOOT;
+        }
+        else // if ( !mqttif_connected)
+        {
+            UTILS_ASSERT( !mqttif_connected );
+            Serial.printf("SENSOR_WAIT_MQTT_CONNECT: waiting for mqtt connect for (%f) sec\n", psensor->state_elapsed_ms/1000.0);
+            if (psensor->state_elapsed_ms > THRESH_WAIT_FOR_MQTT_CONNECT_MS)
+            {
+                Serial.printf("SENSOR_WAIT_MQTT_CONNECT: exceeded wait time threshold; rebooting\n");
+                next_state = SENSOR_REBOOT;
+            }
         }
         break;
     }
