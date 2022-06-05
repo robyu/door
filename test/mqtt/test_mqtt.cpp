@@ -61,6 +61,7 @@ void setup(void) {
     Serial.begin(115200);
     UNITY_BEGIN();
 
+    randomSeed(millis());
     setup_wifi();
 
     if (WiFi.status() != WL_CONNECTED)
@@ -103,10 +104,10 @@ void test_connect_local_broker(void)
 
 void test_pub_sub(void)
 {
-    char topic[] = "home/garage/door";
+    char topic[] = "home/unit/test";
     boolean retval;
     
-    connect_mqtt_broker(public_mqtt_broker, mqtt_port, 5);
+    connect_mqtt_broker(local_mqtt_broker, mqtt_port, 5);
     TEST_ASSERT_TRUE(pmqtt_client->connected());
 
     // subscribe
@@ -121,10 +122,14 @@ void test_pub_sub(void)
     int max_attempts = 100;
     while ((rx_length <= 0) && (count < max_attempts))
     {
+        int serialnum = random();
+        String msg = "hello hello " + String(serialnum);
+        
         // publish to same topic on first iteration
         if (count==0)
         {
-            retval = pmqtt_client->publish(topic, "hello hello");
+            Serial.printf("publishing msg (%s)\n", msg.c_str());
+            retval = pmqtt_client->publish(topic, msg.c_str());
             TEST_ASSERT_TRUE(retval);
         }
         pmqtt_client->loop();  // important!
@@ -146,11 +151,12 @@ void test_smoke(void)
 
 void loop() {
     RUN_TEST(test_smoke);
-    RUN_TEST(test_connect_public_broker);
+    // RUN_TEST(test_connect_public_broker);
     RUN_TEST(test_connect_local_broker);
     RUN_TEST(test_pub_sub);
     pmqtt_client->disconnect();
     UNITY_END();
+    delay(1000);
 }
 
 

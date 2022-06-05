@@ -17,6 +17,7 @@ void setup(void) {
     Serial.begin(115200);
     UNITY_BEGIN();
 
+    randomSeed(millis());
     setup_wifi();
 
     if (WiFi.status() != WL_CONNECTED)
@@ -89,12 +90,12 @@ void test_pub_sub(void)
 {
     mqttif_config_t config;
     mqttif_t mqttif;
-    char topic[] = "/home/test/mqtt_if";
+    char topic[] = "home/test/mqtt_if";
     boolean retval;
     char prx_topic[MQTTIF_MAX_LEN_STR];
     char prx_payload[MQTTIF_MAX_LEN_STR];
-    
-    mqttif_set_default_config(&config, public_mqtt_broker, mqtt_port);
+
+    mqttif_set_default_config(&config, local_mqtt_broker, mqtt_port);
     mqttif_init(&mqttif, &config);
 
     // subscribe
@@ -111,9 +112,12 @@ void test_pub_sub(void)
     while ((num_msgs_rcvd <= 0) && (count < max_attempts))
     {
         int msgs_in_queue;
+        int serialnum = random();
+        String msg = "hello hello " + String(serialnum);
+
         if (count==0)
         {
-            retval = mqttif_publish(&mqttif, topic, "hello hello");
+            retval = mqttif_publish(&mqttif, topic, msg.c_str());
             TEST_ASSERT_TRUE(retval);
         }
         delay(100);

@@ -185,10 +185,12 @@ bool mqttif_publish(mqttif_t *p, const char *ptopic, const char *ppayload)
     is_connected = connect_mqtt_broker(p->pmqtt_client);
     if (false==is_connected)
     {
+        Serial.printf("mqttif_pubish: WARNING mqtt client not connected\n");
         return false;
     }
     UTILS_ASSERT(is_connected==true);
 
+    Serial.printf("mqttif_publish: publish (%s) (%s)\n", ptopic, ppayload);
     retval = pmqtt_client->publish(ptopic, ppayload);
 
     // call loop immediately to push it out (?)

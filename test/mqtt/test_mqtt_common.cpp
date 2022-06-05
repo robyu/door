@@ -82,5 +82,8 @@ void setup_wifi(void)
     TEST_ASSERT_TRUE(WiFi.status() == WL_CONNECTED);
 
     Serial.println("Connected to the WiFi network");
+
+    IPAddress ipaddr = WiFi.localIP();
+    Serial.printf("WM_CONNECTED: got IP address (%s)\n", ipaddr.toString().c_str());
 }
 
