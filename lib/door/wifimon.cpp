@@ -23,7 +23,7 @@ blink intervals assume delay(100) in main loop
 #define LED_SLOW_BLINK 10
 #define LED_FAST_BLINK  1
 
-#define PORTAL_TIMEOUT_SEC 60
+#define PORTAL_TIMEOUT_SEC 90
 
 WiFiManager wifi_manager;
 
