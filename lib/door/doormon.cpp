@@ -70,24 +70,21 @@ static doormon_state_t do_update(doormon_t *pstate)
         break;
 
     case DM_DOOR_CLOSED:
-        if ((switch_update_state(&pstate->door_sensor0)==DOOR_OPEN) ||
-            (switch_update_state(&pstate->test_button)==1) ||
-            (pstate->test_flag==1))
+        if ((pstate->sensor_state == DOOR_OPEN) ||
+            (pstate->test_button_state == 1) ||
+            (pstate->test_flag) )
         {
             next_state = DM_DOOR_OPENING;
         }
         break;
 
     case DM_DOOR_OPENING:
-        if ((switch_update_state(&pstate->door_sensor0)==DOOR_OPEN) ||
-            (switch_update_state(&pstate->test_button)==1) ||
-            (pstate->test_flag)) 
+        if ((pstate->sensor_state==DOOR_OPEN) ||
+            (pstate->test_button_state == 1) ||
+            (pstate->test_flag) ) 
         {
             if (utils_get_elapsed_msec_and_reset(&pstate->transition_time_ms) > pstate->transition_wait_ms)
             {
-#ifdef DEBUG                
-                Serial.println("doormon: door is definitely open");
-#endif
                 next_state = DM_DOOR_OPEN;
             }
         }
@@ -99,29 +96,21 @@ static doormon_state_t do_update(doormon_t *pstate)
         break;
 
     case DM_DOOR_OPEN:
-        if ((switch_update_state(&pstate->door_sensor0)==DOOR_CLOSED) &&
-            (switch_update_state(&pstate->test_button)==0) &&
+        if ((pstate->sensor_state==DOOR_CLOSED) &&
+            (pstate->test_button_state == 0) &&
             (pstate->test_flag==0))
         {
             next_state = DM_DOOR_CLOSING;
         }
-        else
-        {
-            // door sensors = open
-            ;
-        }
         break;
 
     case DM_DOOR_CLOSING:
-        if ((switch_update_state(&pstate->door_sensor0)==DOOR_CLOSED) &&
-            (switch_update_state(&pstate->test_button)==0) &&
+        if ((pstate->sensor_state==DOOR_CLOSED) &&
+            (pstate->test_button_state == 0) &&
             (pstate->test_flag==0) )
         {
             if (utils_get_elapsed_msec_and_reset(&pstate->transition_time_ms) > pstate->transition_wait_ms)
             {
-#ifdef DEBUG                
-                Serial.println("doormon: door is definitely closed");
-#endif
                 next_state = DM_DOOR_CLOSED;
             }
         }
@@ -138,15 +127,32 @@ static doormon_state_t do_update(doormon_t *pstate)
         utils_restart();
     }
 
+    if (next_state != pstate->curr_state)
+    {
+        Serial.printf("    doormon::do_update: transition (%s) -> (%s)\n",
+                      doormon_state_to_string(pstate->curr_state).c_str(),
+                      doormon_state_to_string(next_state).c_str() );
+
+        // note time at transition
+        pstate->transition_time_ms = millis();
+
+        pstate->curr_state = next_state;
+    }
+
     return next_state;
 }
 
 static void do_steadystate(doormon_t *pstate)
 {
     pstate->state_elapsed_time_ms = utils_get_elapsed_msec_and_reset(&pstate->transition_time_ms);
+    pstate->sensor_state = switch_update_state(&pstate->door_sensor0);
+    pstate->test_button_state = switch_update_state(&pstate->test_button);
 
     switch(pstate->curr_state)
     {
+    case DM_INIT:
+        break;
+        
     case DM_DOOR_CLOSED:
         pstate->led_state = 0;
         break;
@@ -170,43 +176,6 @@ static void do_steadystate(doormon_t *pstate)
     utils_set_led(pstate->led_pin, pstate->led_state);
 }
 
-static void do_transitions(doormon_t *pstate, doormon_state_t next_state)
-{
-    if (next_state == pstate->curr_state)
-    {
-        ; // pass
-    }
-    else
-    {
-        Serial.println(doormon_state_to_string(pstate->curr_state) + "-->" + doormon_state_to_string(next_state));
-
-        // always register time of transition
-        pstate->transition_time_ms = millis();
-        
-        switch(next_state)
-        {
-        case DM_DOOR_CLOSED:
-            break;
-            
-        case DM_DOOR_OPENING:
-            break;
-            
-        case DM_DOOR_OPEN:
-            break;
-            
-        case DM_DOOR_CLOSING:
-            break;
-
-        default:
-            //
-            // shouldn't ever get here!
-            Serial.println("doormon:do_transitions illegal state " + doormon_state_to_string(pstate->curr_state));
-            utils_restart();
-        }
-        pstate->curr_state = next_state;
-    }
-}
-
 doormon_state_t doormon_update(doormon_t *pstate)
 {
     doormon_state_t next_state;
@@ -216,9 +185,8 @@ doormon_state_t doormon_update(doormon_t *pstate)
     //         switch_update_state(&pstate->test_button);
 
     // }
-    next_state = do_update(pstate);
-    do_transitions(pstate, next_state);
     do_steadystate(pstate);
+    next_state = do_update(pstate);
     return next_state;
 }
 
@@ -232,7 +200,6 @@ const String doormon_get_curr_state_as_string(const doormon_t *pstate)
 {
     doormon_state_t curr_state = pstate->curr_state;
     return doormon_state_to_string(curr_state);
-
 }
 
 void doormon_set_test_flag(doormon_t *pstate, int val)

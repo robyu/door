@@ -41,6 +41,7 @@ typedef struct
     float door_open_duration_ms;
     long state_start_time;
     long state_elapsed_ms;
+    unsigned long door_duration_count;
 
     int reset_btn_longpress;
     wifimon_state_t wifimon_state;
@@ -124,7 +125,7 @@ void publish_mqtt(sensor_t *psensor, msg_type_t msg)
         char pmsg[128];
         mqttif_publish(pmqttif, "home/garage-sensor/door-detector/door-status","open");
         mqttif_publish(pmqttif, "home/garage-sensor/door-detector/open-duration",String(elapsed_ms/1000.0).c_str());
-        sprintf(pmsg, "door open for %100.3f min\n", elapsed_ms/(1000.0 * 60));
+        sprintf(pmsg, "door open for (%-6.2f) min\n", elapsed_ms/(1000.0 * 60));
         mqttif_publish(pmqttif, "home/broadcast/door", pmsg);
         break;
     }
@@ -175,13 +176,13 @@ static void do_steadystate(sensor_t *psensor)
     case SENSOR_ONLINE:
         psensor->wifimon_state = wifimon_update(&psensor->wifimon);
         psensor->reset_btn_longpress = reboot_update_state(&psensor->rebooter);
+        psensor->state_elapsed_ms = utils_get_elapsed_msec_and_reset(&psensor->state_start_time);
         mqttif_update(&psensor->mqttif);
 
         handle_mqtt_rx(psensor);
 
         psensor->prev_doormon_state = psensor->doormon_state;
         psensor->doormon_state = doormon_update(&psensor->doormon);
-        utils_restart();
         break;
 
     case SENSOR_REBOOT:
@@ -221,7 +222,6 @@ sensor_state_t do_transitions(sensor_t *psensor)
     case SENSOR_WAIT_WIFI_CONNECT:
         if (psensor->reset_btn_longpress) 
         {
-            Serial.printf("detected reset button long press\n");
             next_state = SENSOR_REBOOT;
         }
         else if (psensor->wifimon_state==WM_CONNECTED)
@@ -258,7 +258,6 @@ sensor_state_t do_transitions(sensor_t *psensor)
         
         if (psensor->reset_btn_longpress)  
         {
-            Serial.printf("detected reset button long press\n");
             next_state = SENSOR_REBOOT;
         }
         else if (psensor->wifimon_state==WM_NOT_CONNECTED)
@@ -291,27 +290,47 @@ sensor_state_t do_transitions(sensor_t *psensor)
         {
             next_state = SENSOR_WAIT_MQTT_CONNECT;
         }
-        else if ((psensor->reset_btn_longpress) || (psensor->mqtt_reboot_request))
+        else if (psensor->reset_btn_longpress)
         {
             next_state = SENSOR_REBOOT;
         }
-        
-        if (psensor->doormon_state==DM_DOOR_OPEN)
+        else if (psensor->mqtt_reboot_request)
         {
-            if (psensor->prev_doormon_state != psensor->doormon_state)
+            Serial.printf("received MQTT reboot request\n");
+            next_state = SENSOR_REBOOT;
+        }
+
+        Serial.printf("SENSOR_ONLINE =======================\n");
+        Serial.printf("  doormon prev state = (%s)\n", doormon_state_to_string(psensor->prev_doormon_state).c_str());
+        Serial.printf("  doormon state = (%s)\n", doormon_state_to_string(psensor->doormon_state).c_str());
+        Serial.printf("=======================\n");
+        if ((psensor->prev_doormon_state == DM_INIT) ||
+            (psensor->prev_doormon_state == DM_DONT_USE))
+        {
+            // we're just starting up, so ignore this
+        }
+        else if (psensor->doormon_state==DM_DOOR_OPEN)
+        {
+            unsigned long thresh_multiple = (int)(psensor->state_elapsed_ms / (1.0 * THRESH_DOOR_OPEN_MS));
+            
+            if (psensor->prev_doormon_state == DM_DOOR_OPENING) // respond only to this transition
             {
                 // door is newly opened
                 publish_mqtt(psensor, TX_MSG_DOOR_IS_OPEN);
+
+                psensor->door_duration_count = 0;
             }
-            else if (doormon_get_elapsed_state_time_ms(&psensor->doormon) > THRESH_DOOR_OPEN_MS)
+            else if ( thresh_multiple > psensor->door_duration_count)
             {
                 // door has been open for a while
                 publish_mqtt(psensor, TX_MSG_DOOR_IS_OPEN);
+
+                psensor->door_duration_count = thresh_multiple;
             }
         }
-        else if (psensor->doormon_state==DM_DOOR_CLOSED)
+        else if (psensor->doormon_state==DM_DOOR_CLOSED) // respond only to this transition
         {
-            if (psensor->prev_doormon_state != psensor->doormon_state)
+            if (psensor->prev_doormon_state == DM_DOOR_CLOSING)
             {
                 // door has just closed
                 publish_mqtt(psensor, TX_MSG_DOOR_HAS_CLOSED);

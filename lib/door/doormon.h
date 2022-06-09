@@ -22,13 +22,16 @@ typedef struct
     switch_t test_button; // 2
     int test_flag; // 3
 
-    long int transition_wait_ms;
+    long int transition_wait_ms; // door transition time threshold
 
     int led_pin;
     int led_state;
     doormon_state_t curr_state;
     long int transition_time_ms;  // the clock at time of state transition
     unsigned long state_elapsed_time_ms; // how long we've been in a particular state
+
+    int sensor_state;
+    int test_button_state;
 } doormon_t;
 
 #define DOORMON_DOOR_TRANSITION_WAIT_MS    (5 * 1000)

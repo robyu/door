@@ -18,6 +18,11 @@ int reboot_update_state(rebooter_t *p)
     utils_set_led(p->led_pin, btn_state==1);
 
     longpress_flag = btn_state && (switch_get_state_duration_ms(&p->reboot_button) > p->duration_thresh_ms);
+
+    if (longpress_flag)
+    {
+        Serial.printf("REBOOT UPDATE STATE: detected reset button long press\n");
+    }
     return longpress_flag;
 }
 
