@@ -38,10 +38,10 @@ typedef struct
     mqttif_t mqttif;
 
     int mqtt_reboot_request;
-    float door_open_duration_ms;
     long state_start_time;
     long state_elapsed_ms;
-    unsigned long door_duration_count;
+    unsigned long door_open_interval_count;
+    long door_open_time;
 
     int reset_btn_longpress;
     wifimon_state_t wifimon_state;
@@ -110,22 +110,32 @@ void init_mqttif(sensor_t *psensor)
     Serial.printf("  init_mqtt: exit\n");
 }
 
+void subscribe_mqtt(sensor_t *psensor)
+{
+}
+
 void publish_mqtt(sensor_t *psensor, msg_type_t msg)
 {
     mqttif_t *pmqttif = &psensor->mqttif;
+    char pmsg[128];
 
     switch(msg)
     {
     case TX_MSG_REGISTRATION:
         mqttif_publish(pmqttif, "home/garage-sensor/state", "ready");
+
+        snprintf(pmsg, 128, "%s", WiFi.localIP().toString().c_str());
+        mqttif_publish(pmqttif, "home/garage-sensor/ip_addr", pmsg);
         break;
     case TX_MSG_DOOR_IS_OPEN:
     {
-        long elapsed_ms = doormon_get_elapsed_state_time_ms(&psensor->doormon);
-        char pmsg[128];
-        mqttif_publish(pmqttif, "home/garage-sensor/door-detector/door-status","open");
-        mqttif_publish(pmqttif, "home/garage-sensor/door-detector/open-duration",String(elapsed_ms/1000.0).c_str());
-        sprintf(pmsg, "door open for (%-6.2f) min\n", elapsed_ms/(1000.0 * 60));
+        float elapsed_min = (psensor->door_open_interval_count * THRESH_DOOR_OPEN_MS) / (1000.0 * 60);
+        mqttif_publish(pmqttif, "home/garage-sensor/door-detector/door-status", "open");
+
+        snprintf(pmsg, 128, "%8.2f min", elapsed_min);
+        mqttif_publish(pmqttif, "home/garage-sensor/door-detector/open-duration", pmsg);
+
+        snprintf(pmsg, 128, "door open for (%8.2f) min", elapsed_min);
         mqttif_publish(pmqttif, "home/broadcast/door", pmsg);
         break;
     }
@@ -270,6 +280,7 @@ sensor_state_t do_transitions(sensor_t *psensor)
         {
             Serial.printf("MQTT server connected\n");
             publish_mqtt(psensor, TX_MSG_REGISTRATION);
+            subscribe_mqtt(psensor);
             next_state = SENSOR_ONLINE;
         }
         else // if ( !mqttif_connected)
@@ -311,21 +322,20 @@ sensor_state_t do_transitions(sensor_t *psensor)
         }
         else if (psensor->doormon_state==DM_DOOR_OPEN)
         {
-            unsigned long thresh_multiple = (int)(psensor->state_elapsed_ms / (1.0 * THRESH_DOOR_OPEN_MS));
-            
             if (psensor->prev_doormon_state == DM_DOOR_OPENING) // respond only to this transition
             {
+                psensor->door_open_interval_count = 0;
+                psensor->door_open_time = millis();
+                
                 // door is newly opened
                 publish_mqtt(psensor, TX_MSG_DOOR_IS_OPEN);
-
-                psensor->door_duration_count = 0;
             }
-            else if ( thresh_multiple > psensor->door_duration_count)
+            else if ( (millis() - psensor->door_open_time) > THRESH_DOOR_OPEN_MS)
             {
                 // door has been open for a while
+                psensor->door_open_interval_count++;
+                psensor->door_open_time = millis();  // reset door_open_time
                 publish_mqtt(psensor, TX_MSG_DOOR_IS_OPEN);
-
-                psensor->door_duration_count = thresh_multiple;
             }
         }
         else if (psensor->doormon_state==DM_DOOR_CLOSED) // respond only to this transition
