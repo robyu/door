@@ -112,6 +112,14 @@ void init_mqttif(sensor_t *psensor)
 
 void subscribe_mqtt(sensor_t *psensor)
 {
+    bool retval;
+
+    /*
+      use wildcard to subscribe to all topics home/garage-sensor/...
+    */
+
+    retval = mqttif_sub_topic(&psensor->mqttif, "home/garage-sensor/#");
+    UTILS_ASSERT(retval);
 }
 
 void publish_mqtt(sensor_t *psensor, msg_type_t msg)
@@ -154,7 +162,27 @@ void publish_mqtt(sensor_t *psensor, msg_type_t msg)
 
 void handle_mqtt_rx(sensor_t *psensor)
 {
-    ;
+    char ptopic[MQTTIF_MAX_LEN_STR];
+    char ppayload[MQTTIF_MAX_LEN_STR];
+    int num_msgs;
+
+    num_msgs = mqttif_check_rx_msgs(&psensor->mqttif, ptopic, ppayload, MQTTIF_MAX_LEN_STR);
+
+    while( num_msgs)
+    {
+        Serial.printf("sensor::handle_mqtt_rx: %d messages in queue\n", num_msgs);
+
+        Serial.printf("sensor::handle_mqtt_rx received (%s) (%s)\n", ptopic, ppayload);
+
+        if (strcmp(ptopic, "home/garage-sensor/reset/reset-now/set")==0)
+        {
+            psensor->mqtt_reboot_request |= 1;
+        }
+        
+        num_msgs = mqttif_check_rx_msgs(&psensor->mqttif, ptopic, ppayload, MQTTIF_MAX_LEN_STR);
+
+    }
+    Serial.printf("sensor::handle_mqtt_rx: %d messages in queue\n", num_msgs);
 }
 
 static void do_steadystate(sensor_t *psensor)
@@ -188,7 +216,6 @@ static void do_steadystate(sensor_t *psensor)
         psensor->reset_btn_longpress = reboot_update_state(&psensor->rebooter);
         psensor->state_elapsed_ms = utils_get_elapsed_msec_and_reset(&psensor->state_start_time);
         mqttif_update(&psensor->mqttif);
-
         handle_mqtt_rx(psensor);
 
         psensor->prev_doormon_state = psensor->doormon_state;

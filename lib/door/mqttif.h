@@ -15,12 +15,13 @@ typedef struct
     int max_num_connect_attempts;
 } mqttif_config_t;
 
-#define MQTTIF_NUM_RX 3
+#define MQTTIF_NUM_RX 10
 
 typedef struct
 {
     char ptopic[MQTTIF_MAX_LEN_STR];
-    char ppayload[MQTTIF_MAX_LEN_STR];
+    byte ppayload[MQTTIF_MAX_LEN_STR];
+    unsigned int len_payload; 
 } mqttif_rx_msg_t;
 
 typedef struct
@@ -39,7 +40,7 @@ bool mqttif_is_connected(const mqttif_t *p);
 bool mqttif_publish(mqttif_t *p, const char *ptopic, const char *ppayload);
 bool mqttif_update(mqttif_t *p);
 
-int mqttif_get_num_rx_msgs(mqttif_t *p);
+//int mqttif_get_num_rx_msgs(mqttif_t *p);
 int mqttif_check_rx_msgs(mqttif_t *p, char *ptopic, char *ppayload, int len_str);
 void mqttif_disconnect(mqttif_t *p);
 

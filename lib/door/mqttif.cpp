@@ -25,7 +25,7 @@ static PubSubClient *pmqtt_client = new PubSubClient(wifi_client);
 copy rx topic + payload into prx_msgs array
 */
 mqttif_t *pmqttif_global;
-static void rx_callback(char *ptopic, byte *ppayload, unsigned int length)
+static void rx_callback(const char *ptopic, byte *ppayload, unsigned int payload_len)
 {
     mqttif_t *p;
     UTILS_ASSERT(pmqtt_client!=NULL);
@@ -33,10 +33,9 @@ static void rx_callback(char *ptopic, byte *ppayload, unsigned int length)
 
     int rx_msg_index = p->num_rx_msgs;
 
-    Serial.printf("rx_callback: rcvd topic (%s)\n", ptopic);
     if (p->num_rx_msgs > MQTTIF_NUM_RX)
     {
-        Serial.printf("MQTT RX BUFFER overflow\n");
+        Serial.printf("    MQTT RX BUFFER overflow\n");
     }
     else
     {
@@ -45,13 +44,22 @@ static void rx_callback(char *ptopic, byte *ppayload, unsigned int length)
         UTILS_ASSERT((rx_msg_index >= 0) && (rx_msg_index < MQTTIF_NUM_RX));
         pcurr_rx_msg = &(p->prx_msgs[rx_msg_index]);
 
-        memset(pcurr_rx_msg->ptopic, 0, MQTTIF_MAX_LEN_STR);
+        UTILS_ZERO_STRUCT(pcurr_rx_msg);
+
+        // assume that ptopic is null-terminated
         strncpy(pcurr_rx_msg->ptopic, ptopic, MQTTIF_MAX_LEN_STR - 1);
         
-        memset(pcurr_rx_msg->ppayload, 0, MQTTIF_MAX_LEN_STR);
-        strncpy(pcurr_rx_msg->ppayload, (char *)ppayload, MQTTIF_MAX_LEN_STR - 1);
+        if (payload_len >= MQTTIF_MAX_LEN_STR)
+        {
+            payload_len = MQTTIF_MAX_LEN_STR - 1;
+        }
+        pcurr_rx_msg->len_payload = payload_len;
+        
+        memmove(pcurr_rx_msg->ppayload, ppayload, payload_len);
 
         p->num_rx_msgs++;
+
+        Serial.printf("mqttif::RX_CALLBACK: rcvd (%s):(%s)\n", pcurr_rx_msg->ptopic, (char *)pcurr_rx_msg->ppayload);
     }
     return;
 }
@@ -226,10 +234,10 @@ int  mqttif_check_rx_msgs(mqttif_t *p, char *ptopic, char *ppayload, int len_str
 {
     int num_msgs_available = p->num_rx_msgs;
     UTILS_ASSERT(len_str >= MQTTIF_MAX_LEN_STR);
+    memset(ptopic, 0, len_str);
+    memset(ppayload, 0, len_str);
     if (num_msgs_available <= 0)
     {
-        memset(ptopic, 0, len_str);
-        memset(ppayload, 0, len_str);
         return 0;
     }
     else
@@ -237,8 +245,9 @@ int  mqttif_check_rx_msgs(mqttif_t *p, char *ptopic, char *ppayload, int len_str
         int n;
         // dequeue msg 0
         mqttif_rx_msg_t *prx_msg = &(p->prx_msgs[0]);
+
         strncpy(ptopic,   prx_msg->ptopic,    len_str);
-        strncpy(ppayload, prx_msg->ppayload,  len_str);
+        strncpy(ppayload, (char *)prx_msg->ppayload,  len_str); // convert payload from byte into char
 
         //
         // move the remaining msgs
@@ -247,8 +256,7 @@ int  mqttif_check_rx_msgs(mqttif_t *p, char *ptopic, char *ppayload, int len_str
             mqttif_rx_msg_t *psrc_msg  = &(p->prx_msgs[ n ]);
             mqttif_rx_msg_t *pdest_msg = &(p->prx_msgs[ n-1 ]);
 
-            strncpy(pdest_msg->ptopic,   psrc_msg->ptopic,   MQTTIF_MAX_LEN_STR);
-            strncpy(pdest_msg->ppayload, psrc_msg->ppayload, MQTTIF_MAX_LEN_STR);
+            memmove(pdest_msg, psrc_msg, sizeof(*pdest_msg));
         }
 
         p->num_rx_msgs--;
