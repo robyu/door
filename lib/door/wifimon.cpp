@@ -20,7 +20,7 @@ solid = WM_RECONFIG (AP mode)
 
 blink intervals assume delay(100) in main loop
 */
-#define LED_SLOW_BLINK 10
+#define LED_SLOW_BLINK 4
 #define LED_FAST_BLINK  1
 
 #define PORTAL_TIMEOUT_SEC 90

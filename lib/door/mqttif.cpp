@@ -64,55 +64,14 @@ static void rx_callback(const char *ptopic, byte *ppayload, unsigned int payload
     return;
 }
 
-#if 0
-bool connect_mqtt_brokerNOTINUSE(mqttif_t *p)
-{
-    int count = 0;
-    PubSubClient *pmqtt_client = p->pmqtt_client;
-    mqttif_config_t *pconfig = &p->config;
-    
-    Serial.printf("connect_mqtt_broker: WiFi.status() = %d\n",(int)(WiFi.status()==WL_CONNECTED));
-
-    Serial.printf("WiFi.macAddress() = %s\n",String(WiFi.macAddress()).c_str());
-
-    /*--------------------------------------------------------*/
-    Serial.printf("pmqtt_client=%p\n",(void *)pmqtt_client);
-    Serial.printf("pmqttif_global->pmqtt_client=%p\n",(void *)pmqttif_global->pmqtt_client);
-
-
-    Serial.printf("0 connected() = %d\n", (int) (pmqttif_global->pmqtt_client->connected()) );
-    Serial.printf("1 connected() = %d\n", (int) (pmqtt_client->connected()) );
-    
-    UTILS_ASSERT(0);
-    
-    //connecting to a mqtt broker
-    // usually we need only 1 attempt
-    while (!pmqtt_client->connected() && (count < pconfig->max_num_connect_attempts)) {
-        Serial.printf("attempt %d\n",count);  
-        count++;
-        UTILS_ASSERT(0);
-        //Serial.printf("Attemping connection: client %s -> mqtt broker %s\n", client_id.c_str(), pconfig->pbroker_addr);
-        if (pmqtt_client->connect("esp8266"))
-        {
-            Serial.printf("mqtt broker connected after %d attempts\n", count);
-        } else {
-            Serial.printf("failed with state (%s)\n", String(pmqtt_client->state()).c_str());
-            Serial.println(pmqtt_client->state());
-            delay(2000);
-        }
-    }
-    return pmqtt_client->connected();
-}
-#endif
-
 static bool connect_mqtt_broker(PubSubClient *pmqtt_client)
 {
     int count = 0;
     String client_name = "door-";
-    Serial.printf("connect_mqtt_broker: WiFi.status() = %d\n",(int)(WiFi.status()==WL_CONNECTED));
+    //Serial.printf("connect_mqtt_broker: WiFi.status() = %d\n",(int)(WiFi.status()==WL_CONNECTED));
     //Serial.printf("WiFi.macAddress() = %s\n",String(WiFi.macAddress()).c_str());
     client_name = client_name + WiFi.macAddress();
-    Serial.printf("client name = %s\n",client_name.c_str());
+    //Serial.printf("client name = %s\n",client_name.c_str());
 
     /*--------------------------------------------------------*/
     while (!pmqtt_client->connected() && (count < 5))

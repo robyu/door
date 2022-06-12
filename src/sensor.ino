@@ -8,7 +8,7 @@
 #include "utils.h"
 #include "mqttif.h"
 
-#define LOOP_DELAY_MS (1000*1)
+#define LOOP_DELAY_MS (250)
 #define THRESH_DOOR_OPEN_MS (1000*60)
 
 // wifi typically it takes 8-10 sec to establish connection after calling WiFi.begin
@@ -142,9 +142,6 @@ void publish_mqtt(sensor_t *psensor, msg_type_t msg)
 
         snprintf(pmsg, 128, "%8.2f min", elapsed_min);
         mqttif_publish(pmqttif, "home/garage-sensor/door-detector/open-duration", pmsg);
-
-        snprintf(pmsg, 128, "door open for (%8.2f) min", elapsed_min);
-        mqttif_publish(pmqttif, "home/broadcast/door", pmsg);
         break;
     }
     case TX_MSG_DOOR_HAS_CLOSED:
@@ -152,7 +149,7 @@ void publish_mqtt(sensor_t *psensor, msg_type_t msg)
         break;
         
     case TX_MSG_REBOOT:
-        mqttif_publish(pmqttif, "home/broadcast/reset", "resetting now");
+        mqttif_publish(pmqttif, "home/garage-sensor/state", "resetting");
         break;
             
     default:
@@ -170,9 +167,8 @@ void handle_mqtt_rx(sensor_t *psensor)
 
     while( num_msgs)
     {
-        Serial.printf("sensor::handle_mqtt_rx: %d messages in queue\n", num_msgs);
-
-        Serial.printf("sensor::handle_mqtt_rx received (%s) (%s)\n", ptopic, ppayload);
+        //Serial.printf("sensor::handle_mqtt_rx: %d messages in queue\n", num_msgs);
+        //Serial.printf("sensor::handle_mqtt_rx received (%s) (%s)\n", ptopic, ppayload);
 
         if (strcmp(ptopic, "home/garage-sensor/reset/reset-now/set")==0)
         {
@@ -182,12 +178,12 @@ void handle_mqtt_rx(sensor_t *psensor)
         num_msgs = mqttif_check_rx_msgs(&psensor->mqttif, ptopic, ppayload, MQTTIF_MAX_LEN_STR);
 
     }
-    Serial.printf("sensor::handle_mqtt_rx: %d messages in queue\n", num_msgs);
+    //Serial.printf("sensor::handle_mqtt_rx: %d messages in queue\n", num_msgs);
 }
 
 static void do_steadystate(sensor_t *psensor)
 {
-    Serial.printf("do_steadystate: steady state = (%s)\n",state_to_string(sensor.sensor_state));
+    Serial.printf("sensor::do_steadystate: steady state = (%s)\n",state_to_string(sensor.sensor_state));
     switch(psensor->sensor_state)
     {
     case SENSOR_INIT:
@@ -235,13 +231,13 @@ static void do_steadystate(sensor_t *psensor)
         Serial.printf("unexpected state: %s\n",state_to_string(psensor->sensor_state));
         UTILS_ASSERT(0);
     }
-    Serial.printf("do_steadystate: exit\n");
+    //Serial.printf("do_steadystate: exit\n");
 }
 
 sensor_state_t do_transitions(sensor_t *psensor)
 {
     sensor_state_t next_state = psensor->sensor_state;
-    Serial.printf("do_transitions\n");
+    //Serial.printf("sensor::do_transitions\n");
     switch(psensor->sensor_state)
     {
     case SENSOR_INIT:
@@ -267,10 +263,7 @@ sensor_state_t do_transitions(sensor_t *psensor)
             // wifi is up, so init mqtt interface
             init_mqttif(psensor);
 
-            Serial.printf("== MQTTIF: RUNNING UPDATE RIGHT NOW\n");
             mqttif_update(&psensor->mqttif);
-            Serial.printf("== MQTTIF: DONE\n");
-            
             
             psensor->state_start_time = millis(); 
             next_state = SENSOR_WAIT_MQTT_CONNECT;
@@ -280,7 +273,7 @@ sensor_state_t do_transitions(sensor_t *psensor)
         {
             UTILS_ASSERT(psensor->wifimon_state == WM_NOT_CONNECTED);
             
-            Serial.printf("SENSOR_WAIT_WIFI_CONNECT: waiting for wifi connect for (%f) sec\n", psensor->state_elapsed_ms/1000.0);
+            Serial.printf("sensor::do_transitions SENSOR_WAIT_WIFI_CONNECT: waiting for wifi connect for (%f) sec\n", psensor->state_elapsed_ms/1000.0);
             if (psensor->state_elapsed_ms > THRESH_WAIT_FOR_WIFI_CONNECT_MS)
             {
                 Serial.printf("SENSOR_WAIT_WIFI_CONNECT: exceeded wait time threshold; rebooting\n");
@@ -299,13 +292,13 @@ sensor_state_t do_transitions(sensor_t *psensor)
         }
         else if (psensor->wifimon_state==WM_NOT_CONNECTED)
         {
-            Serial.printf("lost wifi connection\n");
+            Serial.printf("sensor::do_transitions lost wifi connection\n");
             psensor->state_start_time = millis(); 
             next_state = SENSOR_WAIT_WIFI_CONNECT;
         }
         else if (mqttif_connected)
         {
-            Serial.printf("MQTT server connected\n");
+            Serial.printf("sensor::do_transitions MQTT server connected\n");
             publish_mqtt(psensor, TX_MSG_REGISTRATION);
             subscribe_mqtt(psensor);
             next_state = SENSOR_ONLINE;
@@ -313,10 +306,10 @@ sensor_state_t do_transitions(sensor_t *psensor)
         else // if ( !mqttif_connected)
         {
             UTILS_ASSERT( !mqttif_connected );
-            Serial.printf("SENSOR_WAIT_MQTT_CONNECT: waiting for mqtt connect for (%f) sec\n", psensor->state_elapsed_ms/1000.0);
+            Serial.printf("sensor::do_transitions SENSOR_WAIT_MQTT_CONNECT: waiting for mqtt connect for (%f) sec\n", psensor->state_elapsed_ms/1000.0);
             if (psensor->state_elapsed_ms > THRESH_WAIT_FOR_MQTT_CONNECT_MS)
             {
-                Serial.printf("SENSOR_WAIT_MQTT_CONNECT: exceeded wait time threshold; rebooting\n");
+                Serial.printf("sensor::do_transitions SENSOR_WAIT_MQTT_CONNECT: exceeded wait time threshold; rebooting\n");
                 next_state = SENSOR_REBOOT;
             }
         }
@@ -334,14 +327,14 @@ sensor_state_t do_transitions(sensor_t *psensor)
         }
         else if (psensor->mqtt_reboot_request)
         {
-            Serial.printf("received MQTT reboot request\n");
+            Serial.printf("sensor::do_transitions received MQTT reboot request\n");
             next_state = SENSOR_REBOOT;
         }
 
-        Serial.printf("SENSOR_ONLINE =======================\n");
-        Serial.printf("  doormon prev state = (%s)\n", doormon_state_to_string(psensor->prev_doormon_state).c_str());
-        Serial.printf("  doormon state = (%s)\n", doormon_state_to_string(psensor->doormon_state).c_str());
-        Serial.printf("=======================\n");
+        // Serial.printf("SENSOR_ONLINE =======================\n");
+        // Serial.printf("  doormon prev state = (%s)\n", doormon_state_to_string(psensor->prev_doormon_state).c_str());
+        // Serial.printf("  doormon state = (%s)\n", doormon_state_to_string(psensor->doormon_state).c_str());
+        // Serial.printf("=======================\n");
         if ((psensor->prev_doormon_state == DM_INIT) ||
             (psensor->prev_doormon_state == DM_DONT_USE))
         {
@@ -379,7 +372,7 @@ sensor_state_t do_transitions(sensor_t *psensor)
         Serial.printf("unexpected state: %s\n",state_to_string(psensor->sensor_state));
         UTILS_ASSERT(0);
     }
-    Serial.printf("do_transitions: exit\n");
+    //Serial.printf("do_transitions: exit\n");
     return next_state;
 }
 
@@ -388,13 +381,13 @@ void loop() {
     static int num_iter=0;
     sensor_state_t next_state = SENSOR_DONT_USE;
     
-    Serial.printf("\nLOOP TOP (%d)\n", num_iter);
+    //Serial.printf("\nLOOP TOP (%d)\n", num_iter);
     do_steadystate(&sensor);
     next_state = do_transitions(&sensor);
 
     if (next_state != sensor.sensor_state)
     {
-        Serial.printf("state transition: (%s) -> (%s)\n",
+        Serial.printf("sensor::loop state transition: (%s) -> (%s)\n",
                       state_to_string(sensor.sensor_state),
                       state_to_string(next_state));
 

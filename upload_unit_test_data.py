@@ -11,7 +11,7 @@ def get_args():
     p.add_argument("-o", "--fnameout", default="data/unit_tests.json", help="output filename; default is data/unit_tests.json")
     p.add_argument("-s", "--ssid", required=True, help="Wifi SSID name")
     p.add_argument("-p", "--pwd", required=True, help="Wifi password")
-    p.add_argument("-n", "--noupload", action="store_true", default=False, help="do not upload to esp8266")
+    p.add_argument("-u", "--upload", action="store_true", default=False, help="upload to esp8266")
     args = p.parse_args()
     return args
 
@@ -57,7 +57,7 @@ if __name__ == "__main__":
         f.write(filled)
     print("done")
     
-    if args.noupload==False:
+    if args.upload==True:
         upload_data_dir()
     #
     

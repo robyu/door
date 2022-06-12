@@ -24,6 +24,7 @@ dpio()
     fi
 
     docker run --rm \
+           -it \
 	   -v $(pwd)/dotplatformio:/.platformio \
 	   -v "$(pwd)":/workspace \
 	   -u `id -u $USER`:`id -g $USER` \
