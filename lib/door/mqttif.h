@@ -14,7 +14,7 @@ typedef struct
     int mqtt_port;
 } mqttif_config_t;
 
-#define MQTTIF_NUM_RX 10
+#define MQTTIF_NUM_RX 3
 
 typedef struct
 {

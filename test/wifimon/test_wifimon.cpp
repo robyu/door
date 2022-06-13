@@ -174,10 +174,10 @@ void test_wifi_param_file_read_write(void)
 {
     wifimon_t wifimon;
     char pmqtt_server[128];
-    short mqtt_port;
+    int mqtt_port;
 
     char pmqtt_server2[WIFIMON_MAX_LEN_MQTT_SERVER];
-    short mqtt_port2;
+    int mqtt_port2;
 
     wifimon_init(&wifimon, 
                  LED_WIFI,

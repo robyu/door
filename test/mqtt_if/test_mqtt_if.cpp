@@ -137,7 +137,7 @@ void test_pub_sub(void)
 void loop() {
     //RUN_TEST(test_connect_public_broker);
     RUN_TEST(test_connect_local_broker);
-    //RUN_TEST(test_pub_sub);
+    RUN_TEST(test_pub_sub);
     UNITY_END();
 }
 
