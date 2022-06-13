@@ -11,7 +11,6 @@ void mqttif_set_default_config(mqttif_config_t *pconfig, const char *pbroker_add
     strncpy(pconfig->pbroker_addr, pbroker_addr, MQTTIF_MAX_LEN_STR);
 
     pconfig->mqtt_port = mqtt_port;
-    pconfig->max_num_connect_attempts = 10;
 }
 
 /*
@@ -64,27 +63,32 @@ static void rx_callback(const char *ptopic, byte *ppayload, unsigned int payload
     return;
 }
 
-static bool connect_mqtt_broker(PubSubClient *pmqtt_client)
+static bool connect_mqtt_broker(mqttif_t *p)
 {
     int count = 0;
     String client_name = "door-";
-    //Serial.printf("connect_mqtt_broker: WiFi.status() = %d\n",(int)(WiFi.status()==WL_CONNECTED));
-    //Serial.printf("WiFi.macAddress() = %s\n",String(WiFi.macAddress()).c_str());
+    PubSubClient *pmqtt_client = p->pmqtt_client;
+    mqttif_config_t *pconfig = &p->config;
+    
+    Serial.printf("connect_mqtt_broker: WiFi.status() = %d\n",(int)(WiFi.status()==WL_CONNECTED));
+    Serial.printf("WiFi.macAddress() = %s\n",String(WiFi.macAddress()).c_str());
     client_name = client_name + WiFi.macAddress();
-    //Serial.printf("client name = %s\n",client_name.c_str());
+    Serial.printf("client name = %s\n",client_name.c_str());
+
+    pmqtt_client->setServer(pconfig->pbroker_addr, pconfig->mqtt_port);
 
     /*--------------------------------------------------------*/
-    while (!pmqtt_client->connected() && (count < 5))
+    while ( (false==pmqtt_client->connected()) && (count < 20) )
     {
         Serial.printf("attempt %d\n",count);  
         count++;
-        //Serial.printf("Attemping connection: client %s -> mqtt broker %s\n", client_id.c_str(), pconfig->pbroker_addr);
-        if (pmqtt_client->connect(client_name.c_str()))
+
+        //if (pmqtt_client->connect(client_name.c_str()))
+        if (pmqtt_client->connect("client"))
         {
             Serial.printf("mqtt broker connected after %d attempts\n", count);
         } else {
             Serial.printf("failed with state (%s)\n", String(pmqtt_client->state()).c_str());
-            Serial.println(pmqtt_client->state());
             delay(500);
         }
     }
@@ -104,10 +108,6 @@ void mqttif_init(mqttif_t *p, const mqttif_config_t *pconfig)
     Serial.printf("  mqttif_init: using broker addr=(%s)\n",p->config.pbroker_addr);
     Serial.printf("  mqttif_init: using port=(%d)\n",p->config.mqtt_port);
 
-    // DO NOT pass pointers to pconfig to PubSubClient.setServer, because
-    // pconfig might be on the stack and PubSubClient merely copies the pointer.
-    // jeezus
-    pmqtt_client->setServer(p->config.pbroker_addr, p->config.mqtt_port);
     pmqtt_client->setCallback(rx_callback);
 }
 
@@ -126,7 +126,7 @@ bool mqttif_sub_topic(mqttif_t *p, const char *ptopic)
     bool is_connected;
     bool retval;
     PubSubClient *pmqtt_client = p->pmqtt_client;
-    is_connected = connect_mqtt_broker(p->pmqtt_client);
+    is_connected = connect_mqtt_broker(p);
     if (false==is_connected)
     {
         return false;
@@ -149,7 +149,7 @@ bool mqttif_publish(mqttif_t *p, const char *ptopic, const char *ppayload)
     PubSubClient *pmqtt_client = p->pmqtt_client;
     bool retval;
 
-    is_connected = connect_mqtt_broker(p->pmqtt_client);
+    is_connected = connect_mqtt_broker(p);
     if (false==is_connected)
     {
         Serial.printf("mqttif_pubish: WARNING mqtt client not connected\n");
@@ -167,14 +167,14 @@ bool mqttif_publish(mqttif_t *p, const char *ptopic, const char *ppayload)
 }
 
 /*
-  update mqttif
+  update mqttif: connect & loop
 
   returns
   bool is_connected 
 */
 bool mqttif_update(mqttif_t *p)
 {
-    bool is_connected = connect_mqtt_broker(p->pmqtt_client);
+    bool is_connected = connect_mqtt_broker(p);
     if (true==is_connected)
     {
         p->pmqtt_client->loop();

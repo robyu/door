@@ -12,7 +12,6 @@ typedef struct
 {
     char pbroker_addr[MQTTIF_MAX_LEN_STR];
     int mqtt_port;
-    int max_num_connect_attempts;
 } mqttif_config_t;
 
 #define MQTTIF_NUM_RX 10

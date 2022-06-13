@@ -33,6 +33,39 @@ void rx_callback(char *topic, byte *payload, unsigned int length) {
 }
 
 
+//    static bool connect_mqtt_broker(mqttif_t *p)
+void connect_mqtt_broker(const char *broker_addr, int mqtt_port, int max_attempts)
+{
+    int count = 0;
+    String client_name = "door-";
+    
+    Serial.printf("connect_mqtt_broker: WiFi.status() = %d\n",(int)(WiFi.status()==WL_CONNECTED));
+    Serial.printf("WiFi.macAddress() = %s\n",String(WiFi.macAddress()).c_str());
+    client_name = client_name + WiFi.macAddress();
+    Serial.printf("client name = %s\n",client_name.c_str());
+
+    pmqtt_client->setServer(broker_addr, mqtt_port);
+    pmqtt_client->setCallback(rx_callback);
+
+    /*--------------------------------------------------------*/
+    while ( (false==pmqtt_client->connected()) && (count < max_attempts) )
+    {
+        Serial.printf("attempt %d\n",count);  
+        count++;
+
+        //if (pmqtt_client->connect(client_name.c_str()))
+        if (pmqtt_client->connect("client"))
+        {
+            Serial.printf("mqtt broker connected after %d attempts\n", count);
+        } else {
+            Serial.printf("failed with state (%s)\n", String(pmqtt_client->state()).c_str());
+            delay(500);
+        }
+    }
+    //return pmqtt_client->connected();
+}
+
+#if 0
 void connect_mqtt_broker(const char *broker_addr, int mqtt_port, int max_attempts)
 {
     int count = 0;
@@ -56,6 +89,8 @@ void connect_mqtt_broker(const char *broker_addr, int mqtt_port, int max_attempt
     }
     Serial.printf("Connection state = (%s) after (%d) attempts\n", String(pmqtt_client->connected()).c_str(), count);
 }
+#endif
+
 
 void setup(void) {
     Serial.begin(115200);
@@ -151,7 +186,7 @@ void test_smoke(void)
 
 void loop() {
     RUN_TEST(test_smoke);
-    // RUN_TEST(test_connect_public_broker);
+    //RUN_TEST(test_connect_public_broker);
     RUN_TEST(test_connect_local_broker);
     RUN_TEST(test_pub_sub);
     pmqtt_client->disconnect();

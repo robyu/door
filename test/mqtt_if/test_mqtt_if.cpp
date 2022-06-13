@@ -71,14 +71,12 @@ void test_connect_local_broker(void)
 
     
     Serial.printf("===================================================\n");
-    mqttif_set_default_config(&config, local_mqtt_broker, mqtt_port);
-    
+    //mqttif_set_default_config(&config, local_mqtt_broker, mqtt_port);
+    mqttif_set_default_config(&config, "ryu-mbp-2020.local", 1883);
     mqttif_init(&mqttif, &config);
 
-    // must call mqttif_update at least once
-    mqttif_update(&mqttif);
-    
-    connected = mqttif_is_connected(&mqttif);
+    connected = mqttif_update(&mqttif);
+
     Serial.printf("connected=%d\n",(int)connected);
     TEST_ASSERT_TRUE(connected==true);
 
@@ -137,9 +135,9 @@ void test_pub_sub(void)
 }
 
 void loop() {
-    RUN_TEST(test_connect_public_broker);
+    //RUN_TEST(test_connect_public_broker);
     RUN_TEST(test_connect_local_broker);
-    RUN_TEST(test_pub_sub);
+    //RUN_TEST(test_pub_sub);
     UNITY_END();
 }
 
