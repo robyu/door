@@ -77,19 +77,24 @@ static bool connect_mqtt_broker(mqttif_t *p)
 
     pmqtt_client->setServer(pconfig->pbroker_addr, pconfig->mqtt_port);
 
-    /*--------------------------------------------------------*/
-    while ( (false==pmqtt_client->connected()) && (count < 20) )
+    /*
+      try to connect to MQTT broker
+
+      don't loop too many times or too slowly because we want to be responsive for the reset button
+    */
+    while ( (false==pmqtt_client->connected()) && (count < 2) )
     {
-        Serial.printf("attempt %d\n",count);  
+        Serial.printf("mqttif::connect_mqtt_broker attempt %d\n",count);  
         count++;
 
-        //if (pmqtt_client->connect(client_name.c_str()))
         if (pmqtt_client->connect("client"))
         {
-            Serial.printf("mqtt broker connected after %d attempts\n", count);
+            Serial.printf("  mqtt broker connected after %d attempts\n", count);
         } else {
-            Serial.printf("failed with state (%s)\n", String(pmqtt_client->state()).c_str());
-            delay(500);
+            Serial.printf("  failed with state (%s)\n", String(pmqtt_client->state()).c_str());
+            //
+            // connect() takes several seconds, so there's no need to
+            // delay() upon failure
         }
     }
     return pmqtt_client->connected();
