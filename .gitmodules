@@ -1,0 +1,3 @@
+[submodule "docker-platformio-core"]
+	path = docker-platformio-core
+	url = https://github.com/robyu/docker-platformio-core.git

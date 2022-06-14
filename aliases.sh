@@ -3,6 +3,8 @@
 # based on that script in sglahn/platformio-core
 #
 
+#    IMAGE_NAME=sglahn/platformio-core:latest
+IMAGE_NAME=robyu/platformio-core:001
 
 #
 # USAGE: substitute dpio for pio
@@ -10,7 +12,6 @@
 # dpio run
 dpio()
 {
-    IMAGE_NAME=sglahn/platformio-core:latest
     
     DEVICE=
     if [ -e /dev/ttyUSB0 ]; then
@@ -38,8 +39,6 @@ dpio()
 # with a bash prompt
 dpio_bash()
 {
-    IMAGE_NAME=sglahn/platformio-core:latest
-    
     DEVICE=
     if [ -e /dev/ttyUSB0 ]; then
 	DEVICE="--device=/dev/ttyUSB0"
