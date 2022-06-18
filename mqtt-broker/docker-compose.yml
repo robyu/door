@@ -4,7 +4,12 @@
 version: '3'
 services:
    mqttserver:
-      image: eclipse-mosquitto:2.0.14
+      environment:
+         - TZ=America/Los_Angeles
+      #image: eclipse-mosquitto:2.0.14
+      build:
+         context: .
+      image: ryu-mosquitto         
       ports:
          - 1883:1883
          - 9001:9001
