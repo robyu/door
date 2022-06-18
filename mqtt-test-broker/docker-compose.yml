@@ -1,0 +1,22 @@
+#
+# use run-docker-compose.sh to set variables appropriately
+#
+version: '3'
+services:
+   mqttserver:
+      image: eclipse-mosquitto:2.0.14
+      ports:
+         - 1883:1883
+         - 9001:9001
+      volumes:
+         #
+         # apparently docker-compose will convert relative paths to absolute (unlike docker run)
+         - ./mosquitto.conf:/mosquitto/config/mosquitto.conf
+      logging:
+         driver: "json-file"
+         options:
+            max-size: "1m"
+            max-file: "3"
+      command: mosquitto -c /mosquitto/config/mosquitto.conf
+      #command: echo "hello world"
+      restart: unless-stopped
