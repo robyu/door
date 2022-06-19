@@ -8,7 +8,7 @@
 #include "utils.h"
 #include "mqttif.h"
 
-#define LOOP_DELAY_MS (250)
+#define LOOP_DELAY_MS (150)
 #define THRESH_DOOR_OPEN_MS (1000*60)
 
 // wifi typically it takes 8-10 sec to establish connection after calling WiFi.begin

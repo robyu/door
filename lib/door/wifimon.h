@@ -28,10 +28,6 @@ typedef struct
     int led_state;
     int led_counter;
     switch_t reset_button;
-    long threshold_check_reset_ms;
-    long threshold_reconfig_button_ms;
-    long threshold_reconfig_sec;
-    long threshold_not_connected_ms;
     long start_time;
     int reconfig_loop_cnt;
 

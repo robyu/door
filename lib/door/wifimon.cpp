@@ -24,7 +24,8 @@ blink intervals assume delay(100) in main loop
 #define LED_FAST_BLINK  1
 
 #define PORTAL_TIMEOUT_SEC 90
-
+#define THRESHOLD_CHECK_RESET_MS (5000)
+#define THRESHOLD_BUTTON_DOWN_MS (2000)
 WiFiManager wifi_manager;
 
 /*
@@ -147,10 +148,6 @@ void wifimon_init(wifimon_t *pstate, int led_pin, int reconfig_button_pin)
     // it will startup in access point mode again
     // see https://github.com/kentaylor/WiFiManager/blob/master/examples/ConfigOnSwitch/ConfigOnSwitch.ino#L46
     pstate->curr_state = WM_INIT;
-    pstate->threshold_check_reset_ms = 1000;
-    pstate->threshold_reconfig_button_ms = 5000;
-    pstate->threshold_reconfig_sec = 180; 
-    pstate->threshold_not_connected_ms = 20000;
 
     // try to load mqtt parameters from filesystem
     bool b = LittleFS.begin();
@@ -194,7 +191,7 @@ static wifimon_state_t do_transitions(wifimon_t *pstate)
 
         if (reset_button==0)
         {
-            if ((utils_get_elapsed_msec_and_reset(&pstate->start_time) > 2 * pstate->threshold_check_reset_ms) &&
+            if ((utils_get_elapsed_msec_and_reset(&pstate->start_time) > THRESHOLD_CHECK_RESET_MS) &&
                 (pstate->reconfig_loop_cnt >= 5))
             {
 
@@ -220,7 +217,7 @@ static wifimon_state_t do_transitions(wifimon_t *pstate)
             // restart loop count
             pstate->reconfig_loop_cnt = 0;
             
-            if (switch_get_state_duration_ms(&pstate->reset_button) >= pstate->threshold_check_reset_ms)
+            if (switch_get_state_duration_ms(&pstate->reset_button) >= THRESHOLD_BUTTON_DOWN_MS)
             {
                 // long press -> go to reconfig
                 // transition:  open config portal
