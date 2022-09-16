@@ -140,8 +140,12 @@ void publish_mqtt(sensor_t *psensor, msg_type_t msg)
         float elapsed_min = (psensor->door_open_interval_count * THRESH_DOOR_OPEN_MS) / (1000.0 * 60);
         mqttif_publish(pmqttif, "home/garage-sensor/door-detector/door-status", "open");
 
-        snprintf(pmsg, 128, "%8.2f min", elapsed_min);
-        mqttif_publish(pmqttif, "home/garage-sensor/door-detector/open-duration", pmsg);
+        if (elapsed_min >= 999999.0)
+        {
+            elapsed_min = 999999.0;
+        }
+        snprintf(pmsg, 128, "%8.2f", elapsed_min);
+        mqttif_publish(pmqttif, "home/garage-sensor/door-detector/open-duration-min", pmsg);
         break;
     }
     case TX_MSG_DOOR_HAS_CLOSED:
