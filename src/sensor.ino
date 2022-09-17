@@ -382,7 +382,7 @@ sensor_state_t do_transitions(sensor_t *psensor)
 
 // the loop function runs over and over again forever
 void loop() {
-    static int num_iter=0;
+    static unsigned int num_iter=0;
     sensor_state_t next_state = SENSOR_DONT_USE;
     
     //Serial.printf("\nLOOP TOP (%d)\n", num_iter);
@@ -399,10 +399,6 @@ void loop() {
     }
     delay(LOOP_DELAY_MS);
 
-    if (num_iter > 9999)
-    {
-        utils_restart();
-    }
     num_iter++;
 }
 
