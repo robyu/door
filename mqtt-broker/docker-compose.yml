@@ -1,6 +1,3 @@
-#
-# use run-docker-compose.sh to set variables appropriately
-#
 version: '3'
 services:
    mqttserver:
@@ -9,7 +6,7 @@ services:
       #image: eclipse-mosquitto:2.0.14
       build:
          context: .
-      image: ryu-mosquitto         
+      image: robyu/ryu-mosquitto:rel001         
       ports:
          - 1883:1883
          - 9001:9001

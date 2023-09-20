@@ -1,5 +1,17 @@
 # MQTT BROKER
 
+## Building the Image
+
+First make sure you have an appropriate tag set in the 'image' field, 
+e.g. robyu/ryu-mosquitto:rel001.
+Then:
+> docker compose build
+
+then 
+> docker login
+> docker push robyu/ryu-mosquitto:rel001
+
+
 The MQTT broker is implemented as a a docker-compose app. Use start-docker-mqtt.sh
 to start the server:
 ```
