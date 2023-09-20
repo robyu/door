@@ -19,7 +19,7 @@ After developing and testing DOOR on a protoboard, I soldered it onto a breadboa
 
 ![](./readme-images/IMG_4701.JPG)
 
-![](.readme-images/IMG_4700.JPG)
+![](./readme-images/IMG_4700.JPG)
 
 Detailed Documentation
 
